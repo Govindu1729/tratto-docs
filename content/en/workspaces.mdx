@@ -95,7 +95,6 @@ Beyond your first workspace, the request is refused in this order:
 | Status | Code | When |
 |---|---|---|
 | 403 | `TENANT_SUSPENDED` | One of the workspaces you own is suspended: `Your account has a suspended workspace: a new one cannot be created.` |
-| 409 | `CONFLICT` | Another of your workspaces has not been migrated yet: `Another of your workspaces has not been migrated yet: a new one cannot be created.` Write to **support@tratto.email** |
 | 409 | `CONFLICT` | You already own 10 workspaces, counting those being deleted (see [Owned and joined workspaces](#owned-and-joined-workspaces)): write to **support@tratto.email** |
 | 429 | `QUOTA_EXCEEDED` | You already own as many active workspaces as your plan allows: delete one or upgrade the plan |
 
