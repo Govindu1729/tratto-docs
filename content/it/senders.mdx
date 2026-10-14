@@ -189,11 +189,14 @@ client.workspace.update({'senders': {'marketing': None}})
 
 ## Nella dashboard
 
-Apri **Impostazioni → Mittenti**. La pagina mostra una riga per tipo. Un tipo
-non configurato dice «Usa il mittente generale.», e il mittente generale è
-mostrato in una riga a parte in cima alla pagina. Il selettore degli
-indirizzi propone solo i domini verificati del workspace. I campi del mittente
-non sono più nella scheda **Workspace**.
+Apri **Impostazioni → Mittenti**. La prima riga è il mittente generale, poi
+una riga per tipo. Un tipo non configurato dice «Usa il mittente generale.».
+Ogni riga, compresa quella del generale, ha il suo nome, il suo indirizzo e il
+suo **Salva**: salvare il mittente generale non cambia i mittenti per tipo, e
+salvare un tipo non cambia il generale. Il mittente generale si può sostituire
+ma non togliere. Il selettore degli indirizzi propone solo i domini verificati
+del workspace; senza un dominio verificato il mittente generale è mostrato in
+sola lettura. I campi del mittente non sono più nella scheda **Workspace**.
 
 La checklist di onboarding considera completato il passo del mittente appena il
 workspace ha un mittente qualsiasi, generale o di un tipo.
