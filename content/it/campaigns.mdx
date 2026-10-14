@@ -46,11 +46,13 @@ Usa `GET /v1/campaigns/{id}` per leggerne status, contenuto e statistiche.
 | `templateId` | uno dei due | copia il contenuto del template nella campagna. **Esattamente uno** fra `templateId` e `html`: entrambi, o nessuno, è un 422. Il template deve essere `published`, altrimenti la richiesta è un 422 anche in quel caso |
 | `html` | uno dei due | HTML inline, senza bisogno di un template |
 | `audienceId` | no | **omesso = tutti i contatti del workspace** |
-| `fromName` | no | in mancanza, il mittente di default del workspace |
-| `fromEmail` | no | in mancanza, il mittente di default del workspace |
+| `fromName` | no | in mancanza, il mittente marketing del workspace, poi quello generale |
+| `fromEmail` | no | in mancanza, il mittente marketing del workspace, poi quello generale |
 
 Se né il body né il workspace forniscono un mittente, la richiesta fallisce con
-422 e un messaggio che ti dice di impostare un mittente di default.
+422 e un messaggio che ti dice di impostare un mittente di default. Il mittente
+viene scritto sulla campagna al momento della creazione: vedi
+[Mittenti](/it/docs/senders).
 
 Dalla creazione in poi la campagna possiede una **copia** del contenuto del
 template: modificare il template dopo non cambia una campagna già creata da

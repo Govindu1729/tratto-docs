@@ -18,6 +18,7 @@
     "images",
     "branding",
     "domains",
+    "senders",
     "idempotency",
     "rate-limits",
     "---Email Lifecycle & Deliverability---",

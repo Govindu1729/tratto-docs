@@ -17,6 +17,7 @@
     "images",
     "branding",
     "domains",
+    "senders",
     "idempotency",
     "rate-limits",
     "---Ciclo di Vita & Deliverability---",

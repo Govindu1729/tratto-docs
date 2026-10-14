@@ -1,0 +1,199 @@
+---
+title: Senders
+description: Set a default sender for marketing, automation and transactional email, and see which address each send uses.
+---
+
+A workspace can have one sender per send type, on top of the general default
+sender. This lets marketing, automated and transactional email go out from
+distinct addresses and domains, for example `news@news.yourdomain.com` for
+campaigns and `hello@yourdomain.com` for automations.
+
+## The three send types
+
+| Type | Used by |
+|---|---|
+| `marketing` | A campaign created without a sender, and the test send of a template |
+| `automation` | A flow `send_email` step without `from`, when the flow is activated |
+| `transactional` | Saved, but no send uses it yet: see [Transactional](#transactional) |
+
+Each type is either `null` (not configured) or an object with `fromEmail`,
+`fromName` and `replyTo`. `fromEmail` and `fromName` go together: a type is
+configured or it is not, and a type never borrows half of its sender from the
+general default.
+
+The general default sender is the pair `defaultFromEmail` / `defaultFromName`
+on the workspace. It stays where it was: nothing was copied into the three
+types, and a type you never configured behaves exactly as before.
+
+## How a sender is chosen
+
+For every send, Tratto takes the first value that exists:
+
+| Order | Source |
+|---|---|
+| 1 | The sender set on the resource itself (campaign `fromEmail`/`fromName`, flow step `from`/`fromName`) |
+| 2 | The sender of the matching type (`senders.marketing`, `senders.automation`) |
+| 3 | The general default sender of the workspace (`defaultFromEmail`/`defaultFromName`) |
+| 4 | None: the request fails with `422 VALIDATION_ERROR`, as it did before |
+
+A type that is not configured **inherits** the general default. It is never
+the reason a send is refused.
+
+### Marketing
+
+A campaign created without `fromEmail`/`fromName` takes the marketing sender,
+or the general default if there is none. The sender is written on the campaign
+when it is created: changing the marketing sender later does not change
+campaigns that already exist. See [Campaigns](/en/docs/campaigns).
+
+The [test send of a template](/en/docs/templates#test-send) uses the same
+sender.
+
+### Automation
+
+When you activate a flow, every `send_email` step without its own `from` gets
+the automation sender, or the general default if there is none. The sender is
+**written on the step at activation** and stays there, even if you later change
+the automation sender or the general one. Deactivating and activating the flow
+again does not change it, because the step now has its own `from`.
+
+To change the sender of an existing flow: deactivate it, update its steps
+through the API removing `from`, `fromName` and `replyTo` from the sending step,
+then activate it again. The dashboard cannot do this today: the flow editor has
+no sender field. See [Flows](/en/docs/flows).
+
+A step that inherits the automation sender also inherits its `replyTo`. A step
+with its own `from` keeps its own reply address, or none.
+
+### Transactional
+
+You can save a transactional sender today, but **no send uses it yet**:
+`POST /v1/emails` still requires an explicit `from`. Keep passing `from` on
+every transactional send.
+
+<Callout>
+The `replyTo` of the marketing and transactional senders is saved and
+returned, but today only flows apply a sender's `replyTo`. Campaigns do not
+set a Reply-To header yet.
+</Callout>
+
+## Rules
+
+- **`fromEmail` must be on a verified domain** of the workspace. Otherwise the
+  update fails with `403 FORBIDDEN` and a message naming the domain, for
+  example `Domain 'news.yourdomain.com' is not verified for this tenant.` See
+  [Domains](/en/docs/domains).
+- **`replyTo` needs no verified domain.** It is only checked to be a valid
+  address: a malformed one is a `422`.
+- **`fromName`** is 1 to 100 characters.
+- System emails sent by Tratto itself, such as team invitations, do not use
+  these senders and cannot be configured.
+
+## Read the senders
+
+`GET /v1/workspace` returns `senders` with all three keys, `null` where a type
+is not configured:
+
+```bash
+curl https://api.tratto.email/v1/workspace \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+```json
+{
+  "data": {
+    "defaultFromEmail": "noreply@yourdomain.com",
+    "defaultFromName": "Your Company",
+    "senders": {
+      "marketing": {
+        "fromEmail": "news@news.yourdomain.com",
+        "fromName": "Your Company News",
+        "replyTo": "support@yourdomain.com"
+      },
+      "automation": null,
+      "transactional": null
+    }
+  }
+}
+```
+
+The response has more workspace fields: only the sender fields are shown here.
+
+## Set or clear a sender
+
+`PATCH /v1/workspace` with `senders` updates only the types you send. The
+others keep their value. Sending `null` on a type clears it, and that type goes
+back to the general default. The API key needs the `workspace:write`
+permission (see [Authentication](/en/docs/authentication)).
+
+**cURL**
+```bash
+# Set the marketing sender. automation and transactional are untouched.
+curl -X PATCH https://api.tratto.email/v1/workspace \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "senders": {
+      "marketing": {
+        "fromEmail": "news@news.yourdomain.com",
+        "fromName": "Your Company News",
+        "replyTo": "support@yourdomain.com"
+      }
+    }
+  }'
+
+# Clear it: marketing goes back to the general default sender.
+curl -X PATCH https://api.tratto.email/v1/workspace \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "senders": { "marketing": null } }'
+```
+
+**Node.js** (`@tratto/email` 1.2.0 or newer)
+```javascript
+import { Tratto } from '@tratto/email';
+
+const tratto = new Tratto(process.env.TRATTO_API_KEY!);
+
+await tratto.workspace.update({
+  senders: {
+    marketing: {
+      fromEmail: 'news@news.yourdomain.com',
+      fromName: 'Your Company News',
+      replyTo: 'support@yourdomain.com',
+    },
+  },
+});
+
+await tratto.workspace.update({ senders: { marketing: null } });
+```
+
+**Python** (`tratto-email` 1.2.0 or newer)
+```python
+from tratto import Tratto
+
+client = Tratto('tratto_live_...')
+
+client.workspace.update({
+    'senders': {
+        'marketing': {
+            'fromEmail': 'news@news.yourdomain.com',
+            'fromName': 'Your Company News',
+            'replyTo': 'support@yourdomain.com',
+        }
+    }
+})
+
+client.workspace.update({'senders': {'marketing': None}})
+```
+
+## In the dashboard
+
+Open **Settings → Senders**. The page shows one row per type. A type you have
+not configured says "Uses the general sender.", and the general sender is shown
+in its own line at the top of the page. The address picker
+only offers domains that are verified for the workspace. The sender fields are
+no longer in the **Workspace** tab.
+
+The onboarding checklist counts the sender step as done as soon as the
+workspace has any sender, general or for one type.

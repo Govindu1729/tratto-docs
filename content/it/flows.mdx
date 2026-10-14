@@ -113,7 +113,7 @@ Il `config` di ogni step è `{ chiave: stringa }`, come i trigger — l'API non 
 |---|---|---|
 | `templateId` | Sì, per renderizzare qualcosa | ID di un template — vedi [Template](/it/docs/templates) |
 | `subject` | Consigliata | Se omessa, resta vuota |
-| `from` | Consigliata | Se omessa, resta vuota — i destinatari vedranno un mittente vuoto |
+| `from` | No | Se omessa, l'attivazione la riempie con il mittente automation del workspace, o con quello generale. Senza alcun mittente l'attivazione fallisce con 422. Vedi [Mittenti](/it/docs/senders) |
 | `fromName` | No | Nome visualizzato abbinato a `from` |
 
 ```json
@@ -216,6 +216,14 @@ un `templateId` inesistente fallisce con **404** e
 `Template 'tmpl_abc123' on step 's0' not found.` Pubblica prima il template
 (vedi [Template](/it/docs/templates#pubblica-prima-di-inviare)), poi riprova ad
 attivare.
+
+Uno step senza un proprio `from` riceve il mittente del workspace
+all'attivazione, scritto sullo step: resta quello anche se poi cambi il mittente
+automation o quello generale, e disattivare e riattivare il flow non lo cambia.
+Per cambiarlo, disattiva il flow, aggiorna gli step togliendo `from`,
+`fromName` e `replyTo` dallo step di invio, poi riattivalo. L'editor dei flow
+nella dashboard non ha il campo mittente, quindi si fa via API (vedi
+[Mittenti](/it/docs/senders#automazioni)).
 
 <Callout type="warn">
 Non puoi fare `PATCH` degli `steps` di un flusso `active` — disattiva prima, modifica, riattiva. `trigger` e `name` si possono ancora cambiare mentre è attivo.

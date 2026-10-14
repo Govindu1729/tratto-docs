@@ -63,7 +63,7 @@ Ogni chiave porta con sé un insieme di permessi, applicati ad ogni richiesta: u
 | `webhooks:read` / `webhooks:write` | Leggere / registrare, modificare, ruotare endpoint webhook |
 | `api-keys:read` / `api-keys:write` | Leggere / creare, modificare, revocare API key |
 | `billing:read` / `billing:write` | Leggere piano e consumi / avviare checkout e portale fatturazione |
-| `workspace:write` | Modificare le impostazioni del workspace, mittente predefinito incluso |
+| `workspace:write` | Modificare le impostazioni del workspace, compresi il mittente generale e i [mittenti per tipo](/it/docs/senders) |
 | `members:write` | Cambia il ruolo di un membro con `PATCH /v1/workspace/members/:userId` (legacy, la dashboard non ha ruoli da cambiare). Invitare e rimuovere membri si fa solo dalla dashboard: ogni chiave API riceve `403` (vedi [Team](/it/docs/team#dallapi)) |
 | `*` | Accesso completo — tutti i permessi sopra, inclusi quelli futuri |
 

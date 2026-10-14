@@ -47,11 +47,12 @@ and stats.
 | `templateId` | one of | copies the template's content into the campaign. **Exactly one** of `templateId` or `html`: both, or neither, is a 422. The template must be `published`, or the request is a 422 too |
 | `html` | one of | inline HTML, no template needed |
 | `audienceId` | no | **omitted = every contact in the workspace** |
-| `fromName` | no | falls back to the workspace default sender |
-| `fromEmail` | no | falls back to the workspace default sender |
+| `fromName` | no | falls back to the workspace marketing sender, then to the general default sender |
+| `fromEmail` | no | falls back to the workspace marketing sender, then to the general default sender |
 
 If neither the body nor the workspace supplies a sender, the request fails
-with 422 and a message telling you to set a default sender.
+with 422 and a message telling you to set a default sender. The sender is
+written on the campaign when it is created: see [Senders](/en/docs/senders).
 
 The campaign owns a **copy** of the template's content from creation onward:
 editing the template later does not change a campaign already created from it,

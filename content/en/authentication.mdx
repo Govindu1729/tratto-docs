@@ -63,7 +63,7 @@ Every key carries a set of permissions, and they are enforced on each request: a
 | `webhooks:read` / `webhooks:write` | Read / register, edit, rotate webhook endpoints |
 | `api-keys:read` / `api-keys:write` | Read / create, update, revoke API keys |
 | `billing:read` / `billing:write` | Read plan and usage / start checkout, open the billing portal |
-| `workspace:write` | Change workspace settings, including the default sender |
+| `workspace:write` | Change workspace settings, including the general sender and the per-type [senders](/en/docs/senders) |
 | `members:write` | Change a member's role with `PATCH /v1/workspace/members/:userId` (legacy, the dashboard has no roles to change). Inviting and removing members is dashboard-only: every API key gets `403` (see [Team](/en/docs/team#from-the-api)) |
 | `*` | Full access — every permission above, including future ones |
 
