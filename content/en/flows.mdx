@@ -216,9 +216,12 @@ a `templateId` that does not exist fails with **404** and
 (see [Templates](/en/docs/templates#publish-before-you-send)), then activate
 again.
 
-A step without its own `from` gets the workspace sender at activation, and
-keeps it: changing the automation sender later does not change a flow that is
-already active. Deactivate and activate it again to pick up the new sender (see
+A step without its own `from` gets the workspace sender at activation, written
+on the step: it stays there even if you later change the automation sender or
+the general one, and deactivating and activating the flow again does not change
+it. To change it, deactivate the flow, update the steps removing `from`,
+`fromName` and `replyTo` from the sending step, then activate it again. The
+dashboard flow editor has no sender field, so this is done through the API (see
 [Senders](/en/docs/senders#automation)).
 
 <Callout type="warn">

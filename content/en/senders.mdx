@@ -53,9 +53,14 @@ sender.
 
 When you activate a flow, every `send_email` step without its own `from` gets
 the automation sender, or the general default if there is none. The sender is
-**frozen at activation**: if you change the automation sender later, a flow
-that is already active keeps the old one. Deactivate and activate the flow
-again to pick up the new sender. See [Flows](/en/docs/flows).
+**written on the step at activation** and stays there, even if you later change
+the automation sender or the general one. Deactivating and activating the flow
+again does not change it, because the step now has its own `from`.
+
+To change the sender of an existing flow: deactivate it, update its steps
+through the API removing `from`, `fromName` and `replyTo` from the sending step,
+then activate it again. The dashboard cannot do this today: the flow editor has
+no sender field. See [Flows](/en/docs/flows).
 
 A step that inherits the automation sender also inherits its `replyTo`. A step
 with its own `from` keeps its own reply address, or none.
@@ -185,7 +190,8 @@ client.workspace.update({'senders': {'marketing': None}})
 ## In the dashboard
 
 Open **Settings → Senders**. The page shows one row per type. A type you have
-not configured shows the general address it sends from. The address picker
+not configured says "Uses the general sender.", and the general sender is shown
+in its own line at the top of the page. The address picker
 only offers domains that are verified for the workspace. The sender fields are
 no longer in the **Workspace** tab.
 

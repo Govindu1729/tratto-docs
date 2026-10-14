@@ -50,10 +50,15 @@ L'[invio di prova di un template](/it/docs/templates#invio-di-test) usa lo stess
 ### Automazioni
 
 Quando attivi un flow, ogni step `send_email` senza un proprio `from` riceve il
-mittente automation, o quello generale se manca. Il mittente viene **congelato
-all'attivazione**: se cambi il mittente automation dopo, un flow già attivo
-tiene quello vecchio. Disattiva e riattiva il flow per fargli prendere il nuovo
-mittente. Vedi [Flow](/it/docs/flows).
+mittente automation, o quello generale se manca. Il mittente viene **scritto
+sullo step all'attivazione** e da lì resta quello, anche se poi cambi il
+mittente automation o quello generale. Disattivare e riattivare il flow non lo
+cambia, perché lo step ora ha un proprio `from`.
+
+Per cambiare il mittente di un flow esistente: disattivalo, aggiorna i suoi step
+via API togliendo `from`, `fromName` e `replyTo` dallo step di invio, poi
+riattivalo. La dashboard oggi non permette di farlo: l'editor dei flow non ha il
+campo mittente. Vedi [Flow](/it/docs/flows).
 
 Uno step che eredita il mittente automation eredita anche il suo `replyTo`. Uno
 step con un proprio `from` tiene il proprio indirizzo di risposta, o nessuno.
@@ -185,7 +190,8 @@ client.workspace.update({'senders': {'marketing': None}})
 ## Nella dashboard
 
 Apri **Impostazioni → Mittenti**. La pagina mostra una riga per tipo. Un tipo
-non configurato mostra l'indirizzo generale da cui parte. Il selettore degli
+non configurato dice «Usa il mittente generale.», e il mittente generale è
+mostrato in una riga a parte in cima alla pagina. Il selettore degli
 indirizzi propone solo i domini verificati del workspace. I campi del mittente
 non sono più nella scheda **Workspace**.
 
