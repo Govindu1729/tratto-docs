@@ -1,0 +1,193 @@
+---
+title: Mittenti
+description: Imposta un mittente per le email marketing, automatiche e transazionali, e scopri da quale indirizzo parte ogni invio.
+---
+
+Un workspace può avere un mittente per ogni tipo di invio, oltre al mittente
+generale. Così le email marketing, automatiche e transazionali partono da
+indirizzi e domini distinti, per esempio `news@news.tuodominio.it` per le
+campagne e `ciao@tuodominio.it` per le automazioni.
+
+## I tre tipi di invio
+
+| Tipo | Chi lo usa |
+|---|---|
+| `marketing` | Una campagna creata senza mittente, e l'invio di prova di un template |
+| `automation` | Uno step `send_email` di un flow senza `from`, all'attivazione del flow |
+| `transactional` | Si salva, ma nessun invio lo usa ancora: vedi [Transazionale](#transazionale) |
+
+Ogni tipo è `null` (non configurato) oppure un oggetto con `fromEmail`,
+`fromName` e `replyTo`. `fromEmail` e `fromName` vanno insieme: un tipo è
+configurato oppure no, e non prende mai metà del mittente da quello generale.
+
+Il mittente generale è la coppia `defaultFromEmail` / `defaultFromName` del
+workspace. Resta dov'era: non è stato copiato nei tre tipi, e un tipo che non
+hai mai configurato si comporta esattamente come prima.
+
+## Come si sceglie il mittente
+
+Per ogni invio, Tratto prende il primo valore che esiste:
+
+| Ordine | Fonte |
+|---|---|
+| 1 | Il mittente impostato sulla risorsa stessa (`fromEmail`/`fromName` della campagna, `from`/`fromName` dello step del flow) |
+| 2 | Il mittente del tipo corrispondente (`senders.marketing`, `senders.automation`) |
+| 3 | Il mittente generale del workspace (`defaultFromEmail`/`defaultFromName`) |
+| 4 | Nessuno: la richiesta fallisce con `422 VALIDATION_ERROR`, come prima |
+
+Un tipo non configurato **eredita** il mittente generale. Non è mai il motivo
+per cui un invio viene rifiutato.
+
+### Marketing
+
+Una campagna creata senza `fromEmail`/`fromName` prende il mittente marketing,
+o quello generale se manca. Il mittente viene scritto sulla campagna al momento
+della creazione: cambiare il mittente marketing dopo non cambia le campagne già
+create. Vedi [Campagne](/it/docs/campaigns).
+
+L'[invio di prova di un template](/it/docs/templates#invio-di-test) usa lo stesso mittente.
+
+### Automazioni
+
+Quando attivi un flow, ogni step `send_email` senza un proprio `from` riceve il
+mittente automation, o quello generale se manca. Il mittente viene **congelato
+all'attivazione**: se cambi il mittente automation dopo, un flow già attivo
+tiene quello vecchio. Disattiva e riattiva il flow per fargli prendere il nuovo
+mittente. Vedi [Flow](/it/docs/flows).
+
+Uno step che eredita il mittente automation eredita anche il suo `replyTo`. Uno
+step con un proprio `from` tiene il proprio indirizzo di risposta, o nessuno.
+
+### Transazionale
+
+Oggi puoi salvare un mittente transazionale, ma **nessun invio lo usa ancora**:
+`POST /v1/emails` richiede ancora un `from` esplicito. Continua a passare
+`from` a ogni invio transazionale.
+
+<Callout>
+Il `replyTo` dei mittenti marketing e transazionale viene salvato e
+restituito, ma oggi solo i flow applicano il `replyTo` di un mittente. Le
+campagne non impostano ancora un header Reply-To.
+</Callout>
+
+## Regole
+
+- **`fromEmail` deve stare su un dominio verificato** del workspace.
+  Altrimenti l'aggiornamento fallisce con `403 FORBIDDEN` e un messaggio che
+  nomina il dominio, per esempio
+  `Domain 'news.tuodominio.it' is not verified for this tenant.` Vedi
+  [Domini](/it/docs/domains).
+- **`replyTo` non richiede un dominio verificato.** Viene solo controllato che
+  sia un indirizzo valido: uno malformato dà `422`.
+- **`fromName`** è lungo da 1 a 100 caratteri.
+- Le email di sistema inviate da Tratto stesso, come gli inviti al team, non
+  usano questi mittenti e non sono configurabili.
+
+## Leggere i mittenti
+
+`GET /v1/workspace` restituisce `senders` con tutte e tre le chiavi, `null`
+dove un tipo non è configurato:
+
+```bash
+curl https://api.tratto.email/v1/workspace \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+```json
+{
+  "data": {
+    "defaultFromEmail": "noreply@tuodominio.it",
+    "defaultFromName": "La tua azienda",
+    "senders": {
+      "marketing": {
+        "fromEmail": "news@news.tuodominio.it",
+        "fromName": "Novità dalla tua azienda",
+        "replyTo": "supporto@tuodominio.it"
+      },
+      "automation": null,
+      "transactional": null
+    }
+  }
+}
+```
+
+La risposta contiene altri campi del workspace: qui sono mostrati solo quelli
+del mittente.
+
+## Impostare o azzerare un mittente
+
+`PATCH /v1/workspace` con `senders` aggiorna solo i tipi che invii. Gli altri
+mantengono il loro valore. `null` su un tipo lo azzera, e quel tipo torna al
+mittente generale. La chiave API deve avere il permesso `workspace:write` (vedi
+[Autenticazione](/it/docs/authentication)).
+
+**cURL**
+```bash
+# Imposta il mittente marketing. automation e transactional restano invariati.
+curl -X PATCH https://api.tratto.email/v1/workspace \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "senders": {
+      "marketing": {
+        "fromEmail": "news@news.tuodominio.it",
+        "fromName": "Novità dalla tua azienda",
+        "replyTo": "supporto@tuodominio.it"
+      }
+    }
+  }'
+
+# Azzeralo: marketing torna al mittente generale.
+curl -X PATCH https://api.tratto.email/v1/workspace \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{ "senders": { "marketing": null } }'
+```
+
+**Node.js** (`@tratto/email` 1.2.0 o successiva)
+```javascript
+import { Tratto } from '@tratto/email';
+
+const tratto = new Tratto(process.env.TRATTO_API_KEY!);
+
+await tratto.workspace.update({
+  senders: {
+    marketing: {
+      fromEmail: 'news@news.tuodominio.it',
+      fromName: 'Novità dalla tua azienda',
+      replyTo: 'supporto@tuodominio.it',
+    },
+  },
+});
+
+await tratto.workspace.update({ senders: { marketing: null } });
+```
+
+**Python** (`tratto-email` 1.2.0 o successiva)
+```python
+from tratto import Tratto
+
+client = Tratto('tratto_live_...')
+
+client.workspace.update({
+    'senders': {
+        'marketing': {
+            'fromEmail': 'news@news.tuodominio.it',
+            'fromName': 'Novità dalla tua azienda',
+            'replyTo': 'supporto@tuodominio.it',
+        }
+    }
+})
+
+client.workspace.update({'senders': {'marketing': None}})
+```
+
+## Nella dashboard
+
+Apri **Impostazioni → Mittenti**. La pagina mostra una riga per tipo. Un tipo
+non configurato mostra l'indirizzo generale da cui parte. Il selettore degli
+indirizzi propone solo i domini verificati del workspace. I campi del mittente
+non sono più nella scheda **Workspace**.
+
+La checklist di onboarding considera completato il passo del mittente appena il
+workspace ha un mittente qualsiasi, generale o di un tipo.

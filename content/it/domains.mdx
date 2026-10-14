@@ -197,7 +197,7 @@ La risposta è il dominio completo, `records` inclusi, con `200` qualunque sia l
 - **Invii reali**: un'email inviata con una chiave live (`tratto_live_...`) viene accettata solo se il dominio del `from` è verificato nel tuo workspace. Altrimenti l'API risponde `403` con `FORBIDDEN`.
 - **Corrispondenza esatta**: il controllo confronta il dominio completo dopo la `@`. Verificare `tuodominio.it` non copre `hello.tuodominio.it`: aggiungi e verifica ogni dominio da cui invii.
 - **Invii di test**: le chiavi di test (`tratto_test_...`) saltano questo controllo. Vedi [Test mode](/it/docs/test-mode).
-- **Mittente predefinito**: quando un dominio diventa `verified` per la prima volta e il workspace non ha un mittente predefinito, Tratto lo imposta a `noreply@` su quel dominio.
+- **Mittente generale**: quando un dominio diventa `verified` per la prima volta e il workspace non ha un mittente generale (`defaultFromEmail`), Tratto lo imposta a `noreply@` su quel dominio. I mittenti per tipo (marketing, automation, transactional) non vengono impostati in automatico: vedi [Mittenti](/it/docs/senders).
 
 ## Controlla lo Status del Dominio
 

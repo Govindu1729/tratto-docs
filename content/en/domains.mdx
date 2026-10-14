@@ -197,7 +197,7 @@ The response is the full domain, `records` included, with `200` whatever the out
 - **Live sends**: an email sent with a live key (`tratto_live_...`) is accepted only if its `from` domain is verified in your workspace. Otherwise the API returns `403` with `FORBIDDEN`.
 - **Exact match**: the check compares the full domain after `@`. Verifying `yourdomain.com` does not cover `hello.yourdomain.com`: add and verify each domain you send from.
 - **Test sends**: test keys (`tratto_test_...`) skip this check. See [Test mode](/en/docs/test-mode).
-- **Default sender**: when a domain first becomes `verified` and your workspace has no default sender, Tratto sets it to `noreply@` on that domain.
+- **General default sender**: when a domain first becomes `verified` and your workspace has no general default sender (`defaultFromEmail`), Tratto sets it to `noreply@` on that domain. The per-type senders (marketing, automation, transactional) are not set automatically: see [Senders](/en/docs/senders).
 
 ## Check Domain Status
 

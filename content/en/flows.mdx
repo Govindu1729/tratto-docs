@@ -113,7 +113,7 @@ Every step's `config` is `{ key: string }`, same as triggers — the API doesn't
 |---|---|---|
 | `templateId` | Yes, to render anything | ID of a template — see [Templates](/en/docs/templates) |
 | `subject` | Recommended | Falls back to empty if omitted |
-| `from` | Recommended | Falls back to empty if omitted — recipients will see a blank sender |
+| `from` | No | If omitted, activation fills it with the workspace automation sender, or the general default sender. With no sender at all, activation fails with 422. See [Senders](/en/docs/senders) |
 | `fromName` | No | Display name paired with `from` |
 
 ```json
@@ -215,6 +215,11 @@ a `templateId` that does not exist fails with **404** and
 `Template 'tmpl_abc123' on step 's0' not found.` Publish the template first
 (see [Templates](/en/docs/templates#publish-before-you-send)), then activate
 again.
+
+A step without its own `from` gets the workspace sender at activation, and
+keeps it: changing the automation sender later does not change a flow that is
+already active. Deactivate and activate it again to pick up the new sender (see
+[Senders](/en/docs/senders#automation)).
 
 <Callout type="warn">
 You cannot `PATCH` the `steps` of an `active` flow — deactivate first, edit, reactivate. `trigger` and `name` can still be changed while active.
