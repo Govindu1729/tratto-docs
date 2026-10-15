@@ -189,11 +189,14 @@ client.workspace.update({'senders': {'marketing': None}})
 
 ## In the dashboard
 
-Open **Settings → Senders**. The page shows one row per type. A type you have
-not configured says "Uses the general sender.", and the general sender is shown
-in its own line at the top of the page. The address picker
-only offers domains that are verified for the workspace. The sender fields are
-no longer in the **Workspace** tab.
+Open **Settings → Senders**. The first row is the general sender, followed by
+one row per type. A type you have not configured says "Uses the general
+sender.". Each row, the general one included, has its own name, address and
+**Save**: saving the general sender does not change the per-type senders, and
+saving a type does not change the general one. The general sender can be
+replaced but not cleared. The address picker only offers domains that are
+verified for the workspace; without a verified domain the general sender is
+shown read-only. The sender fields are no longer in the **Workspace** tab.
 
 The onboarding checklist counts the sender step as done as soon as the
 workspace has any sender, general or for one type.
