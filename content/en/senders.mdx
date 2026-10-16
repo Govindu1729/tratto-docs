@@ -14,7 +14,7 @@ campaigns and `hello@yourdomain.com` for automations.
 |---|---|
 | `marketing` | A campaign created without a sender, and the test send of a template |
 | `automation` | A flow `send_email` step without `from`, when the flow is activated |
-| `transactional` | Saved, but no send uses it yet: see [Transactional](#transactional) |
+| `transactional` | An email sent with `POST /v1/emails` without `from` |
 
 Each type is either `null` (not configured) or an object with `fromEmail`,
 `fromName` and `replyTo`. `fromEmail` and `fromName` go together: a type is
@@ -31,8 +31,8 @@ For every send, Tratto takes the first value that exists:
 
 | Order | Source |
 |---|---|
-| 1 | The sender set on the resource itself (campaign `fromEmail`/`fromName`, flow step `from`/`fromName`) |
-| 2 | The sender of the matching type (`senders.marketing`, `senders.automation`) |
+| 1 | The sender set on the resource itself (campaign `fromEmail`/`fromName`, flow step `from`/`fromName`, `from` of a single email) |
+| 2 | The sender of the matching type (`senders.marketing`, `senders.automation`, `senders.transactional`) |
 | 3 | The general default sender of the workspace (`defaultFromEmail`/`defaultFromName`) |
 | 4 | None: the request fails with `422 VALIDATION_ERROR`, as it did before |
 
@@ -67,14 +67,32 @@ with its own `from` keeps its own reply address, or none.
 
 ### Transactional
 
-You can save a transactional sender today, but **no send uses it yet**:
-`POST /v1/emails` still requires an explicit `from`. Keep passing `from` on
-every transactional send.
+`from` is optional on `POST /v1/emails`. When the request has no `from`,
+Tratto uses the transactional sender, or the general default if there is none.
+A request with `from` is sent from that address, exactly as before: the
+transactional sender does not replace it.
+
+- The transactional sender is used as name and address together.
+- The general default is used with its name if `defaultFromName` is set, or as
+  the bare address if only `defaultFromEmail` is.
+- With neither, the request fails with `422 VALIDATION_ERROR` and the message
+  `No sender configured for this email.`, with a suggestion pointing to
+  **Settings → Senders**.
+- With a live key, the domain of the sender that was picked must be verified,
+  as for an explicit `from`: otherwise `403 FORBIDDEN`. Test keys skip this
+  check. See [Domains](/en/docs/domains).
+
+The `replyTo` of the transactional sender applies only when the request has
+no `from` and no `replyTo` of its own. A request with `from` gets no Reply-To
+from the transactional sender.
+
+The SDKs published today still require `from` on `emails.send`: the optional
+`from` is available over HTTP. See [Send Email](/en/docs/send-email).
 
 <Callout>
-The `replyTo` of the marketing and transactional senders is saved and
-returned, but today only flows apply a sender's `replyTo`. Campaigns do not
-set a Reply-To header yet.
+The `replyTo` of the marketing sender is saved and returned, but campaigns do
+not set a Reply-To header yet. Flows and single emails without `from` apply
+their sender's `replyTo`.
 </Callout>
 
 ## Rules

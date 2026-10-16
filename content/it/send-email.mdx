@@ -313,7 +313,7 @@ Successivamente, filtra le email per tag o usali nei webhook.
 
 | Campo | Tipo | Obbligatorio | Descrizione |
 |-------|------|--------------|-------------|
-| `from` | string | ✓ | Indirizzo email del mittente (deve essere da un dominio verificato) |
+| `from` | string | | Mittente, come `Nome <email>` o indirizzo nudo. Con una chiave live il dominio deve essere verificato. Se omesso si usa il mittente transazionale del workspace, o quello generale; se mancano entrambi, `422`. Vedi [Mittenti](/it/docs/senders#transazionale) |
 | `to` | string \| string[] | ✓ | Indirizzo del destinatario, o un array di indirizzi |
 | `cc` | string[] | | Destinatari di copia carbone |
 | `bcc` | string[] | | Destinatari di copia carbone nascosta |
@@ -325,7 +325,7 @@ Successivamente, filtra le email per tag o usali nei webhook.
 | `variables` | object | | Variabili da interpolate nel template |
 | `scheduledAt` | string (ISO 8601) | | Programma email per consegna futura |
 | `tags` | string[] | | Tag di organizzazione |
-| `replyTo` | string | | Indirizzo di risposta |
+| `replyTo` | string | | Indirizzo di risposta. Se omesso in una richiesta senza `from`, si applica il `replyTo` del mittente transazionale |
 | `headers` | object | | Custom email headers (avanzato) |
 
 ## Risposta
