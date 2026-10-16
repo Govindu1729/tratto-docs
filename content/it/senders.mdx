@@ -14,7 +14,7 @@ campagne e `ciao@tuodominio.it` per le automazioni.
 |---|---|
 | `marketing` | Una campagna creata senza mittente, e l'invio di prova di un template |
 | `automation` | Uno step `send_email` di un flow senza `from`, all'attivazione del flow |
-| `transactional` | Si salva, ma nessun invio lo usa ancora: vedi [Transazionale](#transazionale) |
+| `transactional` | Un'email inviata con `POST /v1/emails` senza `from` |
 
 Ogni tipo è `null` (non configurato) oppure un oggetto con `fromEmail`,
 `fromName` e `replyTo`. `fromEmail` e `fromName` vanno insieme: un tipo è
@@ -30,8 +30,8 @@ Per ogni invio, Tratto prende il primo valore che esiste:
 
 | Ordine | Fonte |
 |---|---|
-| 1 | Il mittente impostato sulla risorsa stessa (`fromEmail`/`fromName` della campagna, `from`/`fromName` dello step del flow) |
-| 2 | Il mittente del tipo corrispondente (`senders.marketing`, `senders.automation`) |
+| 1 | Il mittente impostato sulla risorsa stessa (`fromEmail`/`fromName` della campagna, `from`/`fromName` dello step del flow, `from` della singola email) |
+| 2 | Il mittente del tipo corrispondente (`senders.marketing`, `senders.automation`, `senders.transactional`) |
 | 3 | Il mittente generale del workspace (`defaultFromEmail`/`defaultFromName`) |
 | 4 | Nessuno: la richiesta fallisce con `422 VALIDATION_ERROR`, come prima |
 
@@ -65,14 +65,32 @@ step con un proprio `from` tiene il proprio indirizzo di risposta, o nessuno.
 
 ### Transazionale
 
-Oggi puoi salvare un mittente transazionale, ma **nessun invio lo usa ancora**:
-`POST /v1/emails` richiede ancora un `from` esplicito. Continua a passare
-`from` a ogni invio transazionale.
+`from` è facoltativo su `POST /v1/emails`. Quando la richiesta non ha `from`,
+Tratto usa il mittente transazionale, o quello generale se manca. Una
+richiesta con `from` parte da quell'indirizzo, esattamente come prima: il
+mittente transazionale non lo sostituisce.
+
+- Il mittente transazionale si usa con nome e indirizzo insieme.
+- Il mittente generale si usa con il suo nome se `defaultFromName` è
+  impostato, o come indirizzo nudo se c'è solo `defaultFromEmail`.
+- Se mancano entrambi, la richiesta fallisce con `422 VALIDATION_ERROR` e il
+  messaggio `No sender configured for this email.`, con un suggerimento che
+  rimanda a **Impostazioni → Mittenti**.
+- Con una chiave live, il dominio del mittente scelto deve essere verificato,
+  come per un `from` esplicito: altrimenti `403 FORBIDDEN`. Le chiavi test
+  saltano questo controllo. Vedi [Domini](/it/docs/domains).
+
+Il `replyTo` del mittente transazionale si applica solo quando la richiesta
+non ha né `from` né un proprio `replyTo`. Una richiesta con `from` non riceve
+alcun Reply-To dal mittente transazionale.
+
+Gli SDK pubblicati oggi richiedono ancora `from` su `emails.send`: il `from`
+facoltativo è disponibile via HTTP. Vedi [Invia Email](/it/docs/send-email).
 
 <Callout>
-Il `replyTo` dei mittenti marketing e transazionale viene salvato e
-restituito, ma oggi solo i flow applicano il `replyTo` di un mittente. Le
-campagne non impostano ancora un header Reply-To.
+Il `replyTo` del mittente marketing viene salvato e restituito, ma le campagne
+non impostano ancora un header Reply-To. I flow e le singole email senza
+`from` applicano il `replyTo` del loro mittente.
 </Callout>
 
 ## Regole

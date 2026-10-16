@@ -311,7 +311,7 @@ Later, filter emails by tags or use them in webhooks.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `from` | string | ✓ | Sender email address (must be from a verified domain) |
+| `from` | string | | Sender, as `Name <email>` or a bare address. With a live key its domain must be verified. If omitted, the workspace transactional sender is used, or the general default sender; with neither, `422`. See [Senders](/en/docs/senders#transactional) |
 | `to` | string \| string[] | ✓ | Recipient address, or an array of addresses |
 | `cc` | string[] | | Carbon copy recipients |
 | `bcc` | string[] | | Blind carbon copy recipients |
@@ -323,7 +323,7 @@ Later, filter emails by tags or use them in webhooks.
 | `variables` | object | | Variables to interpolate in template |
 | `scheduledAt` | string (ISO 8601) | | Schedule email for future delivery |
 | `tags` | string[] | | Organization tags |
-| `replyTo` | string | | Reply-to address |
+| `replyTo` | string | | Reply-to address. If omitted on a request without `from`, the `replyTo` of the transactional sender applies |
 | `headers` | object | | Custom email headers (advanced) |
 
 ## Response
