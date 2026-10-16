@@ -52,6 +52,9 @@ const { id } = await tratto.emails.send({
 console.log(id); // email_abc123
 ```
 
+`from` can be omitted from **1.5.0 or newer**: Tratto then uses the workspace
+transactional sender. See [Senders](/en/docs/senders#transactional).
+
 Pass an idempotency key as the second argument:
 
 ```typescript
