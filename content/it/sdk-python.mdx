@@ -36,8 +36,7 @@ result = client.emails.send(SendEmailOptions(
 print(result['id'])  # email_abc123
 ```
 
-`from_` si può omettere dalla **2.0.0 o successiva**: Tratto usa allora il
-mittente transazionale del workspace. Vedi [Mittenti](/it/docs/senders#transazionale).
+`from_` si può omettere dalla **2.0.0 o successiva**: Tratto usa allora il mittente transazionale del workspace, o il mittente generale se manca. Vedi [Mittenti](/it/docs/senders#transazionale).
 
 Dalla 2.0.0, `SendEmailOptions` e le altre classi di opzioni accettano solo
 argomenti per nome: `SendEmailOptions('hello@tuodominio.it', ...)` solleva

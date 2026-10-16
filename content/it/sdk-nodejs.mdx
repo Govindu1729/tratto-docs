@@ -52,8 +52,7 @@ const { id } = await tratto.emails.send({
 console.log(id); // email_abc123
 ```
 
-`from` si può omettere dalla **1.5.0 o successiva**: Tratto usa allora il
-mittente transazionale del workspace. Vedi [Mittenti](/it/docs/senders#transazionale).
+`from` si può omettere dalla **1.5.0 o successiva**: Tratto usa allora il mittente transazionale del workspace, o il mittente generale se manca. Vedi [Mittenti](/it/docs/senders#transazionale).
 
 La chiave di idempotenza è il secondo argomento:
 
