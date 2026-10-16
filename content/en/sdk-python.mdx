@@ -36,6 +36,12 @@ result = client.emails.send(SendEmailOptions(
 print(result['id'])  # email_abc123
 ```
 
+`from_` can be omitted from **2.0.0 or newer**: Tratto then uses the workspace transactional sender, or the general default sender if there is none. See [Senders](/en/docs/senders#transactional).
+
+From 2.0.0, `SendEmailOptions` and the other options classes accept keyword
+arguments only: `SendEmailOptions('hello@yourdomain.com', ...)` raises
+`TypeError`.
+
 ## Send with Template
 
 ```python
