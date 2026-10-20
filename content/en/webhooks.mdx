@@ -13,7 +13,7 @@ In the dashboard only the workspace owner manages webhooks: a member gets `403 F
 
 Webhooks are included in the **Starter** and **Growth** plans (requires API
 0.23.0 or later). The plan that counts is the one of the workspace the request
-acts on, whether you call with an API key (live or test) or from a dashboard
+acts on (a copy of its owner's plan), whether you call with an API key (live or test) or from a dashboard
 session.
 
 On a workspace on the **Free** plan, the routes that make a webhook deliver
@@ -41,7 +41,9 @@ you have:
 - `DELETE /v1/webhooks/{id}` (remove)
 - `GET /v1/webhooks/{id}/deliveries` (delivery history)
 
-Webhooks that already exist on a Free workspace keep receiving events. To
+Active webhooks that already exist on a Free workspace keep receiving events.
+One disabled by repeated failures cannot be re-enabled on Free, because that
+needs a secret rotation. To
 check whether your plan includes webhooks, read `limits.webhooks` (`true` or
 `false`) from `GET /v1/workspace`: see
 [Read your own limits from the API](/en/docs/rate-limits#read-your-own-limits-from-the-api).
@@ -163,7 +165,9 @@ Two consequences worth designing for:
 - **Handle duplicates.** Deduplicate on the event `id`.
 
 A webhook disabled by repeated failures has `status: "disabled"`. Rotating its
-secret resets the failure counter and re-enables it.
+secret resets the failure counter and re-enables it; on the Free plan rotation
+is not available (see [Plan availability](#plan-availability)), so a disabled
+webhook stays disabled.
 
 ## Rotate Webhook Secret
 

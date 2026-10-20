@@ -13,7 +13,7 @@ Nella dashboard solo il proprietario del workspace gestisce i webhook: un membro
 
 I webhook sono inclusi nei piani **Starter** e **Growth** (richiede l'API
 0.23.0 o successiva). Conta il piano del workspace su cui agisce la
-richiesta, sia che chiami con una chiave API (live o test) sia da una sessione
+richiesta (copia del piano del proprietario), sia che chiami con una chiave API (live o test) sia da una sessione
 della dashboard.
 
 Su un workspace con piano **Free**, le rotte che fanno consegnare un webhook
@@ -41,8 +41,9 @@ quello che hai:
 - `DELETE /v1/webhooks/{id}` (eliminazione)
 - `GET /v1/webhooks/{id}/deliveries` (storico delle consegne)
 
-I webhook che esistono già su un workspace Free continuano a ricevere gli
-eventi. Per sapere se il tuo piano include i webhook, leggi `limits.webhooks`
+I webhook attivi che esistono già su un workspace Free continuano a ricevere
+gli eventi. Uno disattivato per fallimenti ripetuti non si riattiva sul Free,
+perché serve una rotazione del segreto. Per sapere se il tuo piano include i webhook, leggi `limits.webhooks`
 (`true` o `false`) da `GET /v1/workspace`: vedi
 [Leggi i tuoi limiti dall'API](/it/docs/rate-limits#leggi-i-tuoi-limiti-dallapi).
 
@@ -161,7 +162,9 @@ Due conseguenze da tenere presenti:
 - **Gestisci i duplicati.** Deduplica sul campo `id` dell'evento.
 
 Un webhook disattivato per fallimenti ripetuti ha `status: "disabled"`. Ruotarne
-il secret azzera il contatore e lo riabilita.
+il segreto azzera il contatore dei fallimenti e lo riattiva; sul piano Free la
+rotazione non è disponibile (vedi [Piani che includono i webhook](#piani-che-includono-i-webhook)),
+quindi un webhook disattivato resta disattivato.
 
 ## Ruotare il Secret
 
