@@ -125,7 +125,7 @@ questa forma:
   quelle non inviate ed è sempre presente, `0` se sono andate tutte.
 - Un'email `queued` ha un `id`: il suo stato si legge con
   `GET /v1/emails/{id}`, come per qualsiasi altra email. Un'email `failed` non
-  ha `id`, perché non è stato salvato niente.
+  ha `id` e non verrà inviata.
 - L'`error.message` di un'email fallita dice se c'è stato un addebito. Quando
   non è stato possibile restituire la quota, il messaggio dice che `may still
   count against the monthly quota`. In entrambi i casi non è partito niente.
@@ -136,7 +136,8 @@ questa forma:
 
 Rimanda solo le email fallite, in un **nuovo batch con una nuova
 `Idempotency-Key`**. Ripetere la stessa richiesta con la stessa chiave
-restituisce la risposta originale, fallimenti compresi, e non invia niente.
+restituisce la risposta originale, fallimenti compresi, e non invia niente
+(vedi [Idempotenza](/it/docs/idempotency)).
 
 Se nessuna email del batch è stata messa in coda, l'API risponde `503
 SERVICE_UNAVAILABLE` invece di 202: vedi [Errori](#errori).
@@ -190,18 +191,20 @@ il messaggio `Rate limit exceeded: 10 batch requests/second per API key.` Vedi
 | Stato | Codice | Quando | Scritto o addebitato |
 |---|---|---|---|
 | 422 | `VALIDATION_ERROR` | 0 o più di 100 email; un'email non valida; più di 50 destinatari in un'email; `scheduledAt`, `attachments` o un campo sconosciuto; un header riservato; nessun mittente; un'email oltre 900 KB o un batch oltre 9 MiB dopo il render | Niente |
-| 403 | `FORBIDDEN` | Il dominio mittente di un'email non è verificato (`emails[i]: …`) | Niente |
+| 403 | `FORBIDDEN` | Il dominio mittente di un'email non è verificato (`emails[i]: …`). Controllato solo con una chiave live | Niente |
 | 413 | `PAYLOAD_TOO_LARGE` | Body della richiesta oltre 5 MiB | Niente |
 | 429 | `QUOTA_EXCEEDED` | Restano meno destinatari di quanti ne ha il batch in totale | Niente |
-| 429 | `RATE_LIMITED` | Più di 10 batch al secondo per chiave, o un altro rate limit. Riprova dopo `Retry-After` | Niente |
+| 429 | `RATE_LIMITED` | Più di 10 batch al secondo per chiave, o un altro rate limit. Riprova dopo `Retry-After` se presente, altrimenti dopo un breve backoff | Niente |
 | 409 | `IDEMPOTENCY_CONFLICT` | Stessa `Idempotency-Key`, body diverso | Niente |
 | 409 | `IDEMPOTENCY_IN_PROGRESS` | Stessa `Idempotency-Key` mentre la prima richiesta è ancora in corso | Niente |
-| 503 | `SERVICE_UNAVAILABLE` | Troppi batch in corso, oppure nessuna email è stata messa in coda. Arriva con `Retry-After: 1` | Niente inviato; il messaggio dice se c'è stato un addebito |
-| 500 | `INTERNAL_ERROR` | L'esito del salvataggio delle email non è noto | Non noto |
+| 503 | `SERVICE_UNAVAILABLE` | Troppi batch in corso, oppure nessuna email è stata messa in coda. Arriva con `Retry-After: 1` | Niente inviato; nessun addebito quando ci sono troppi batch in corso, altrimenti il messaggio dice se c'è stato un addebito |
+| 500 | `INTERNAL_ERROR` | L'esito del salvataggio delle email non è noto | Niente inviato; può esserci un addebito |
 
 Dopo un 503, ripeti la stessa richiesta: la stessa `Idempotency-Key` si può
-riusare, perché nessuna email del batch è partita. Dopo un 500, controlla
-`GET /v1/emails` prima di rimandare, per evitare doppioni.
+riusare, perché nessuna email del batch è partita.
+
+Dopo un 500 nessuna email del batch è partita, ma il batch può contare sulla
+quota mensile. Rimandalo: la stessa `Idempotency-Key` si può riusare.
 
 ## Prossimi Passi
 

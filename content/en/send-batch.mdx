@@ -124,8 +124,7 @@ shape:
 - `accepted` counts the emails queued for delivery; `failed` counts the ones
   not sent and is always present, `0` on a full success.
 - A `queued` email has an `id`: read its status with `GET /v1/emails/{id}`,
-  as for any other email. A `failed` email has no `id`, because nothing was
-  stored.
+  as for any other email. A `failed` email has no `id` and will not be sent.
 - A failed email's `error.message` says whether it was charged. When the
   quota could not be given back, the message says it `may still count against
   the monthly quota`. Nothing was sent in either case.
@@ -135,7 +134,8 @@ shape:
 
 Send only the failed emails again, in a **new batch with a new
 `Idempotency-Key`**. Repeating the same request with the same key returns the
-original response, failures included, and sends nothing.
+original response, failures included, and sends nothing (see
+[Idempotency](/en/docs/idempotency)).
 
 If no email of the batch could be queued, the API answers `503
 SERVICE_UNAVAILABLE` instead of a 202: see [Errors](#errors).
@@ -187,18 +187,20 @@ the message `Rate limit exceeded: 10 batch requests/second per API key.` See
 | Status | Code | When | Written or charged |
 |---|---|---|---|
 | 422 | `VALIDATION_ERROR` | 0 or more than 100 emails; an invalid email; more than 50 recipients in one email; `scheduledAt`, `attachments` or an unknown field; a reserved header; no sender; an email over 900 KB or a batch over 9 MiB once rendered | Nothing |
-| 403 | `FORBIDDEN` | The sender domain of an email is not verified (`emails[i]: …`) | Nothing |
+| 403 | `FORBIDDEN` | The sender domain of an email is not verified (`emails[i]: …`). Checked only with a live key | Nothing |
 | 413 | `PAYLOAD_TOO_LARGE` | Request body over 5 MiB | Nothing |
 | 429 | `QUOTA_EXCEEDED` | Fewer recipients left than the batch has in total | Nothing |
-| 429 | `RATE_LIMITED` | More than 10 batches per second per key, or another rate limit. Retry after `Retry-After` | Nothing |
+| 429 | `RATE_LIMITED` | More than 10 batches per second per key, or another rate limit. Retry after `Retry-After` when present, otherwise after a short backoff | Nothing |
 | 409 | `IDEMPOTENCY_CONFLICT` | Same `Idempotency-Key`, different body | Nothing |
 | 409 | `IDEMPOTENCY_IN_PROGRESS` | Same `Idempotency-Key` while the first request is still running | Nothing |
-| 503 | `SERVICE_UNAVAILABLE` | Too many batches in progress, or no email could be queued. Comes with `Retry-After: 1` | Nothing sent; the message says whether it was charged |
-| 500 | `INTERNAL_ERROR` | The outcome of storing the emails is unknown | Unknown |
+| 503 | `SERVICE_UNAVAILABLE` | Too many batches in progress, or no email could be queued. Comes with `Retry-After: 1` | Nothing sent; nothing charged when too many batches are in progress, otherwise the message says whether it was charged |
+| 500 | `INTERNAL_ERROR` | The outcome of storing the emails is unknown | Nothing sent; may be charged |
 
 After a 503, retry the same request: the same `Idempotency-Key` can be
-reused, because no email of the batch was sent. After a 500, read
-`GET /v1/emails` before sending again, to avoid duplicates.
+reused, because no email of the batch was sent.
+
+After a 500, no email of the batch was sent, but the batch may count against
+the monthly quota. Send it again: the same `Idempotency-Key` can be reused.
 
 ## Next Steps
 
