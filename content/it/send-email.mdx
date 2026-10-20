@@ -5,6 +5,8 @@ description: L'endpoint principale per inviare email tramite Tratto
 
 `POST /v1/emails` è l'endpoint principale per inviare email. Invia un'email transazionale semplice, usa un template, programma per dopo, o allega file.
 
+Per inviare fino a 100 email in una sola chiamata, vedi [Invio in Batch](/it/docs/send-batch).
+
 ## Prerequisiti
 
 Prima di poter inviare email, hai bisogno di un **dominio di invio verificato**. Vedi [Domini](/it/docs/domains) per la configurazione.
@@ -471,6 +473,7 @@ destinatari distinti fra `to`, `cc` e `bcc`, ecc.).
 
 ## Prossimi Passi
 
+- **Molte email insieme?** Vedi [Invio in Batch](/it/docs/send-batch)
 - **Tracciare gli eventi email?** Configura [Webhook](/it/docs/webhooks)
 - **Controllare lo stato dell'email?** Vedi [Stato e Ciclo di Vita dell'Email](/it/docs/email-status)
 - **Creare template?** Vai a [Template](/it/docs/templates)

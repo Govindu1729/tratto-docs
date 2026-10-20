@@ -14,6 +14,7 @@ the same account at once, see
 |---|---|---|
 | **100 requests / second** | **API key** | every authenticated endpoint |
 | **500 requests / minute** | **client IP** | every endpoint, authenticated or not |
+| **10 batch requests / second** | **API key** | `POST /v1/emails/batch`, on top of the 100/second; up to 100 emails per call |
 
 The per-key limit is the one an integration meets first: a loop that sends
 without pacing hits 100/s long before it hits 500/min. Its error message names
@@ -29,6 +30,13 @@ against it as well.
 minute**, and that one is **on top of** the 500/minute, not instead of it: a
 preview request spends one unit of each, and whichever budget runs out first
 returns the 429. The per-key limit still applies to it.
+
+A [batch send](/en/docs/send-batch) counts as one request on the 100/second
+limit, whatever the number of emails in it, and also against its own limit of
+10 batch calls per second per key. Over it the 429 carries `Retry-After: 1`
+and the message `Rate limit exceeded: 10 batch requests/second per API key.`
+On the monthly quota every email of the batch counts, one unit per distinct
+recipient.
 
 ## Rate Limit Headers
 

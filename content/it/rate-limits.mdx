@@ -14,6 +14,7 @@ richieste sullo stesso account nello stesso momento, vedi
 |---|---|---|
 | **100 richieste / secondo** | **chiave API** | ogni endpoint autenticato |
 | **500 richieste / minuto** | **IP client** | ogni endpoint, autenticato o no |
+| **10 richieste batch / secondo** | **chiave API** | `POST /v1/emails/batch`, in aggiunta alle 100/secondo; fino a 100 email per chiamata |
 
 Il limite per chiave è quello che un'integrazione incontra per primo: un ciclo
 che invia senza pause tocca le 100/s molto prima delle 500/min. Il messaggio
@@ -29,6 +30,13 @@ API sbagliata, revocata o assente — consumano l'allowance.
 richieste / minuto**, che si **somma** alle 500/minuto invece di sostituirle:
 una richiesta di preview consuma un'unità di entrambi i budget, e il 429 arriva
 da quello che si esaurisce per primo. Il limite per chiave vale anche lì.
+
+Un [invio in batch](/it/docs/send-batch) conta come una richiesta sul limite
+di 100/secondo, qualunque sia il numero di email che contiene, e conta anche
+sul suo limite di 10 chiamate batch al secondo per chiave. Oltre, il 429 ha
+`Retry-After: 1` e il messaggio `Rate limit exceeded: 10 batch requests/second per API key.`
+Sulla quota mensile conta ogni email del batch, un'unità per destinatario
+distinto.
 
 ## Header di Rate Limit
 
