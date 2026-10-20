@@ -9,6 +9,43 @@ l'API, è Tratto a inviarti gli eventi.
 
 Nella dashboard solo il proprietario del workspace gestisce i webhook: un membro riceve `403 FORBIDDEN` (`Only the workspace owner can do this.`). Vedi [Team](/it/docs/team#ruoli).
 
+## Piani che includono i webhook
+
+I webhook sono inclusi nei piani **Starter** e **Growth** (richiede l'API
+0.23.0 o successiva). Conta il piano del workspace su cui agisce la
+richiesta, sia che chiami con una chiave API (live o test) sia da una sessione
+della dashboard.
+
+Su un workspace con piano **Free**, le rotte che fanno consegnare un webhook
+rispondono `403 PLAN_UPGRADE_REQUIRED`:
+
+- `POST /v1/webhooks` (registrare un webhook)
+- `POST /v1/webhooks/{id}/test` (inviare una consegna di prova)
+- `POST /v1/webhooks/{id}/rotate-secret` (ruotare il segreto di firma)
+
+```json
+{
+  "error": {
+    "code": "PLAN_UPGRADE_REQUIRED",
+    "message": "This feature is not included in your plan. Upgrade to use it.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes",
+    "suggestion": "Webhooks are available from the Starter plan. The account owner can upgrade at https://app.tratto.email/settings/billing."
+  }
+}
+```
+
+Queste rotte restano disponibili sul Free, così puoi ancora vedere e ripulire
+quello che hai:
+
+- `GET /v1/webhooks` (elenco)
+- `DELETE /v1/webhooks/{id}` (eliminazione)
+- `GET /v1/webhooks/{id}/deliveries` (storico delle consegne)
+
+I webhook che esistono già su un workspace Free continuano a ricevere gli
+eventi. Per sapere se il tuo piano include i webhook, leggi `limits.webhooks`
+(`true` o `false`) da `GET /v1/workspace`: vedi
+[Leggi i tuoi limiti dall'API](/it/docs/rate-limits#leggi-i-tuoi-limiti-dallapi).
+
 ## Registrare un Webhook
 
 **cURL**
