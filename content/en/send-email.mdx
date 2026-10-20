@@ -5,6 +5,8 @@ description: The core endpoint for sending emails via Tratto
 
 `POST /v1/emails` is the core endpoint for sending emails. Send a simple transactional email, use a template, schedule for later, or attach files.
 
+To send up to 100 emails in one call, see [Send a Batch](/en/docs/send-batch).
+
 ## Prerequisites
 
 Before you can send emails, you need a **verified sending domain**. See [Domains](/en/docs/domains) for setup.
@@ -468,6 +470,7 @@ reuse the same key. See [Idempotency](/en/docs/idempotency).
 
 ## Next Steps
 
+- **Many emails at once?** See [Send a Batch](/en/docs/send-batch)
 - **Track email events?** Set up [Webhooks](/en/docs/webhooks)
 - **Check email status?** See [Email Status & Lifecycle](/en/docs/email-status)
 - **Create templates?** Go to [Templates](/en/docs/templates)

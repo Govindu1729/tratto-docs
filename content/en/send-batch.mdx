@@ -1,0 +1,207 @@
+---
+title: Send a Batch
+description: Send up to 100 emails in one call with POST /v1/emails/batch
+---
+
+`POST /v1/emails/batch` sends up to **100 emails in one request**. Each email
+is independent: its own sender, recipients, subject and content, with the same
+fields as [`POST /v1/emails`](/en/docs/send-email).
+
+Requires API 0.21.0 or later. The SDKs have no batch method yet: call the API
+over HTTP as shown below.
+
+## Request
+
+The body is an object with one field, `emails`: an array of 1 to 100 emails.
+
+```bash
+curl -X POST https://api.tratto.email/v1/emails/batch \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 6f1c2e0a-batch-2026-10-20" \
+  -d '{
+    "emails": [
+      {
+        "from": "hello@yourdomain.com",
+        "to": "alice@example.com",
+        "subject": "Your receipt",
+        "text": "Thanks for your order, Alice."
+      },
+      {
+        "from": "hello@yourdomain.com",
+        "to": ["bob@example.com"],
+        "cc": ["billing@example.com"],
+        "subject": "Your receipt",
+        "templateId": "tmpl_abc123",
+        "variables": { "firstName": "Bob" }
+      }
+    ]
+  }'
+```
+
+```javascript
+const response = await fetch('https://api.tratto.email/v1/emails/batch', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer tratto_live_...',
+    'Content-Type': 'application/json',
+    'Idempotency-Key': crypto.randomUUID(),
+  },
+  body: JSON.stringify({
+    emails: [
+      { from: 'hello@yourdomain.com', to: 'alice@example.com', subject: 'Your receipt', text: 'Thanks, Alice.' },
+      { from: 'hello@yourdomain.com', to: 'bob@example.com', subject: 'Your receipt', text: 'Thanks, Bob.' },
+    ],
+  }),
+});
+const { data } = await response.json();
+console.log(`${data.accepted} queued, ${data.failed} failed`);
+```
+
+Rules for each email of the batch:
+
+- It accepts every field of [`POST /v1/emails`](/en/docs/send-email#full-request-body-reference)
+  except `scheduledAt`. To schedule, send the email on its own with
+  `POST /v1/emails`.
+- `attachments` is not accepted: it fails with 422 (on `POST /v1/emails` it is
+  ignored instead).
+- An unknown field fails with 422: both the body and each email are checked
+  strictly.
+- At most 50 distinct recipients across `to`, `cc` and `bcc`, as on a single
+  send. See [Recipients](/en/docs/send-email#recipients-to-cc-and-bcc).
+
+The request body can be at most **5 MiB**. Once rendered, each email can be at
+most 900 KB and the whole batch at most 9 MiB.
+
+**Validation is all or nothing.** If one email is invalid, the whole batch is
+rejected and nothing is written or charged. `details[].path` names the email
+by its position in the array, starting from 0:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes",
+    "details": [{ "path": "/emails/3/to", "message": "An email can have at most 50 recipients across to, cc and bcc (got 51). Split the send, or use a campaign for a larger audience." }]
+  }
+}
+```
+
+An unverified sender domain answers `403 FORBIDDEN`, and the message starts
+with the position of the email, as in `emails[3]: Domain 'mail.acme.com' is
+not verified for this tenant.`
+
+## Response
+
+A batch that passes validation answers **`202 Accepted`**, always with this
+shape:
+
+```json
+{
+  "data": {
+    "batchId": "batch_V1StGXR8Z5jdHi6BmyT2a",
+    "livemode": true,
+    "accepted": 2,
+    "failed": 1,
+    "emails": [
+      { "id": "email_abc123xyz", "status": "queued", "to": ["alice@example.com"] },
+      {
+        "status": "failed",
+        "to": ["bob@example.com"],
+        "error": {
+          "code": "SERVICE_UNAVAILABLE",
+          "message": "Not sent and not charged: it could not be handed to the delivery queue. Send it again in a new batch, with a new Idempotency-Key."
+        }
+      },
+      { "id": "email_def456uvw", "status": "queued", "to": ["carol@example.com"] }
+    ]
+  }
+}
+```
+
+- `emails` has one entry per email of the request, **in the same order**.
+- `accepted` counts the emails queued for delivery; `failed` counts the ones
+  not sent and is always present, `0` on a full success.
+- A `queued` email has an `id`: read its status with `GET /v1/emails/{id}`,
+  as for any other email. A `failed` email has no `id`, because nothing was
+  stored.
+- A failed email's `error.message` says whether it was charged. When the
+  quota could not be given back, the message says it `may still count against
+  the monthly quota`. Nothing was sent in either case.
+- The 202 has no `Retry-After` header, even when some emails failed.
+
+### Retrying the failed emails
+
+Send only the failed emails again, in a **new batch with a new
+`Idempotency-Key`**. Repeating the same request with the same key returns the
+original response, failures included, and sends nothing.
+
+If no email of the batch could be queued, the API answers `503
+SERVICE_UNAVAILABLE` instead of a 202: see [Errors](#errors).
+
+## Idempotency
+
+One `Idempotency-Key` covers the whole batch, for 24 hours. A replay with the
+same key and the same body returns the same response, a partial one included,
+and sends nothing. The same key with a different body answers `409
+IDEMPOTENCY_CONFLICT`; a request with a key whose first request is still
+running answers `409 IDEMPOTENCY_IN_PROGRESS`. See
+[Idempotency](/en/docs/idempotency).
+
+## Quota
+
+Each email uses one unit of the [monthly quota](/en/docs/rate-limits#plan-limits)
+per distinct recipient in its `to`, `cc` and `bcc`, ignoring case, exactly as
+on a single send. Recipients are deduplicated within one email, never across
+emails: the same address in two emails of the batch uses two units.
+
+The batch reserves the sum of its emails at once, **all or nothing**. If the
+account has fewer recipients left than the batch has in total, the API answers
+`429 QUOTA_EXCEEDED` and nothing is written or sent:
+
+```json
+{
+  "error": {
+    "code": "QUOTA_EXCEEDED",
+    "message": "This batch has 120 recipients, more than the recipients left on the free plan (3000 per month). Every distinct address in to, cc and bcc counts. The quota is shared by every workspace of the account that owns this one.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes",
+    "suggestion": "Send to fewer recipients, or have the workspace owner upgrade the plan at https://app.tratto.email/settings/billing."
+  }
+}
+```
+
+In [test mode](/en/docs/test-mode) the daily cap of 100 test recipients counts
+the sum of the batch in the same way.
+
+## Rate limits
+
+A batch counts as **one request** on the limit of 100 requests per second per
+API key. On top of that, each key can make at most **10 batch requests per
+second**; over it the API answers `429 RATE_LIMITED` with `Retry-After: 1` and
+the message `Rate limit exceeded: 10 batch requests/second per API key.` See
+[Rate Limits](/en/docs/rate-limits).
+
+## Errors
+
+| Status | Code | When | Written or charged |
+|---|---|---|---|
+| 422 | `VALIDATION_ERROR` | 0 or more than 100 emails; an invalid email; more than 50 recipients in one email; `scheduledAt`, `attachments` or an unknown field; a reserved header; no sender; an email over 900 KB or a batch over 9 MiB once rendered | Nothing |
+| 403 | `FORBIDDEN` | The sender domain of an email is not verified (`emails[i]: …`) | Nothing |
+| 413 | `PAYLOAD_TOO_LARGE` | Request body over 5 MiB | Nothing |
+| 429 | `QUOTA_EXCEEDED` | Fewer recipients left than the batch has in total | Nothing |
+| 429 | `RATE_LIMITED` | More than 10 batches per second per key, or another rate limit. Retry after `Retry-After` | Nothing |
+| 409 | `IDEMPOTENCY_CONFLICT` | Same `Idempotency-Key`, different body | Nothing |
+| 409 | `IDEMPOTENCY_IN_PROGRESS` | Same `Idempotency-Key` while the first request is still running | Nothing |
+| 503 | `SERVICE_UNAVAILABLE` | Too many batches in progress, or no email could be queued. Comes with `Retry-After: 1` | Nothing sent; the message says whether it was charged |
+| 500 | `INTERNAL_ERROR` | The outcome of storing the emails is unknown | Unknown |
+
+After a 503, retry the same request: the same `Idempotency-Key` can be
+reused, because no email of the batch was sent. After a 500, read
+`GET /v1/emails` before sending again, to avoid duplicates.
+
+## Next Steps
+
+- **One email at a time?** See [Send Email](/en/docs/send-email)
+- **Track what happens next?** Set up [Webhooks](/en/docs/webhooks)
+- **Plan your throughput?** Read [Rate Limits & Quotas](/en/docs/rate-limits)
