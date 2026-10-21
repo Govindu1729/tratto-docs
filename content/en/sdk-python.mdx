@@ -97,7 +97,8 @@ result = client.emails.send(SendEmailOptions(
 ## Send a Batch
 
 `emails.send_batch()` sends up to 100 emails in one request and requires
-**2.1.0 or newer**. Each item is a `SendEmailOptions` without `scheduled_at`.
+**2.1.0 or newer**. Each item is a `SendEmailOptions` without `scheduled_at`:
+an item with `scheduled_at` gets a 422 whose `details` names the item.
 The [idempotency key](/en/docs/idempotency) covers the whole batch, so it goes
 on the call: an item with its own `idempotency_key` raises `ValueError`.
 

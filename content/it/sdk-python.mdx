@@ -99,7 +99,8 @@ result = client.emails.send(SendEmailOptions(
 
 `emails.send_batch()` invia fino a 100 email in una sola richiesta e richiede
 la **2.1.0 o successiva**. Ogni email è un `SendEmailOptions` senza
-`scheduled_at`. La [chiave di idempotenza](/it/docs/idempotency) vale per tutto
+`scheduled_at`: un'email con `scheduled_at` riceve un 422 i cui `details`
+indicano quale. La [chiave di idempotenza](/it/docs/idempotency) vale per tutto
 il batch, quindi va sulla chiamata: un'email con un suo `idempotency_key`
 solleva `ValueError`.
 

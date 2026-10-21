@@ -6,7 +6,7 @@ updatedAt: 2026-10-01
 
 The official SDK for Node.js and TypeScript: **`@tratto/email`**
 
-Every example on this page typechecks against **1.2.0**. Where a feature needs
+Every example on this page typechecks against the version named next to it, and otherwise against **1.2.0**. Where a feature needs
 a particular version, the page names the minimum one that has it; it never
 names the newest, because that goes stale on its own.
 
@@ -121,16 +121,18 @@ Canceling or rescheduling a scheduled email is available over
 
 `emails.sendBatch()` sends up to 100 emails in one request and requires
 **1.6.0 or newer**. Each email takes the fields of `emails.send()` except
-`scheduledAt` and attachments; the optional second argument is the
+`scheduledAt`; the optional second argument is the
 [idempotency key](/en/docs/idempotency), which covers the whole batch.
 
 ```typescript
+import { randomUUID } from 'node:crypto';
+
 const batch = await tratto.emails.sendBatch(
   [
     { from: 'hello@yourdomain.com', to: 'alice@example.com', subject: 'Your receipt', text: 'Thanks, Alice.' },
     { from: 'hello@yourdomain.com', to: 'bob@example.com', subject: 'Your receipt', text: 'Thanks, Bob.' },
   ],
-  crypto.randomUUID(),
+  randomUUID(),
 );
 
 console.log(`${batch.accepted} queued, ${batch.failed} failed`);
@@ -220,9 +222,9 @@ console.log(campaign.status); // 'draft'
 ```
 
 <Callout type="info">
-The API itself is more permissive than the 1.2.0 types: it accepts inline
+The API itself is more permissive than the 1.6.0 types: it accepts inline
 `html` instead of a `templateId`, and treats an omitted `audienceId` as "every
-contact in the workspace". Neither is expressible through the SDK yet — use
+contact in the workspace". Neither is expressible through the SDK yet. Use
 [HTTP](/en/docs/sdk-http) for those.
 </Callout>
 
@@ -343,7 +345,7 @@ It requires **1.6.0 or newer** and is `undefined` when the API sends none.
 
 ## What the SDK does not cover yet
 
-These endpoints exist in the API and have **no SDK method** in 1.2.0. Call
+These endpoints exist in the API and have **no SDK method** in 1.6.0. Call
 them over [HTTP](/en/docs/sdk-http) until the SDK catches up:
 
 | Capability | HTTP |
@@ -359,16 +361,16 @@ them over [HTTP](/en/docs/sdk-http) until the SDK catches up:
 | API key management | `/v1/api-keys` |
 | Workspace brand logo | `PUT`, `DELETE /v1/workspace/brand/logo` |
 
-Some newer response fields are likewise absent from the 1.2.0 types:
+Some newer response fields are likewise absent from the 1.6.0 types:
 `Workspace` has no `limits` or `brand`, `Contact` has no `trackingOptOut`,
-`ListContactsParams` has no `q`, and `CampaignStats` has no `skipped`,
+and `CampaignStats` has no `skipped`,
 `untracked` or `variants`. The API returns them; the types do not describe
 them yet. `TrattoError` carries `docs` but not `suggestion`, which the Python
 SDK does expose.
 
-Checked against the published `@tratto/email` 1.2.0 on 2026-10-01: eleven rows
-were rechecked, and `campaigns.unschedule` is the one that is now covered
-(see [Stop a Campaign](#stop-a-campaign)). A row here is a promise that the gap
+Checked against the published `@tratto/email` 1.6.0 on 2026-10-21: the ten rows
+are still uncovered, and `ListContactsParams.q` is covered from 1.4.0
+(`contacts.list({ q })`). A row here is a promise that the gap
 is still real, so it is worth rereading at every SDK release.
 
 ---
