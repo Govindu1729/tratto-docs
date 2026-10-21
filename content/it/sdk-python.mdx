@@ -95,6 +95,37 @@ result = client.emails.send(SendEmailOptions(
 ))
 ```
 
+## Invia un Batch
+
+`emails.send_batch()` invia fino a 100 email in una sola richiesta e richiede
+la **2.1.0 o successiva**. Ogni email è un `SendEmailOptions` senza
+`scheduled_at`. La [chiave di idempotenza](/it/docs/idempotency) vale per tutto
+il batch, quindi va sulla chiamata: un'email con un suo `idempotency_key`
+solleva `ValueError`.
+
+```python
+import uuid
+
+result = client.emails.send_batch(
+    [
+        SendEmailOptions(from_='hello@yourdomain.com', to='alice@example.com', subject='La tua ricevuta', text='Grazie, Alice.'),
+        SendEmailOptions(from_='hello@yourdomain.com', to='bob@example.com', subject='La tua ricevuta', text='Grazie, Bob.'),
+    ],
+    idempotency_key=str(uuid.uuid4()),
+)
+
+print(result['accepted'], result['failed'])
+for item in result['emails']:  # stesso ordine della richiesta
+    if item['status'] == 'failed':
+        print(item['to'], item['error']['code'])
+```
+
+Un batch con alcune email non partite restituisce comunque la risposta 202,
+non solleva eccezioni: un'email non partita non ha `id`. Invia di nuovo solo
+quelle, in un nuovo batch con una **nuova** chiave. Dopo un `TrattoError` 503
+o 500 non è partito niente, e ripetere con la **stessa** chiave è sicuro.
+Quota, limiti ed errori sono in [Invio in Batch](/it/docs/send-batch).
+
 ## Ottieni Status Email
 
 ```python
@@ -219,6 +250,11 @@ Oltre a `code` e `status_code`, `TrattoError` porta due campi che arrivano dalla
 risposta dell'API, entrambi dalla **1.2.0 o successiva**: `suggestion`, cioè
 cosa fare dell'errore nelle parole dell'API, e `docs`, il link alla pagina che
 spiega il codice. Valgono `None` quando la risposta non li contiene.
+
+Su un 422 `VALIDATION_ERROR`, `details` elenca cosa è sbagliato e dove: per la
+quarta email di un batch, `e.details[0]['path']` vale `'/emails/3/to'`.
+Richiede la **2.1.0 o successiva** e vale `None` quando la risposta non lo
+contiene.
 
 ```python
 except TrattoError as e:

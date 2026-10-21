@@ -118,6 +118,34 @@ Annullare o riprogrammare un'email programmata si fa via
 [HTTP](/it/docs/sdk-http): non esiste ancora un metodo SDK — vedi
 [Cosa l'SDK non copre](#cosa-lsdk-non-copre-ancora).
 
+## Invia un Batch
+
+`emails.sendBatch()` invia fino a 100 email in una sola richiesta e richiede la
+**1.6.0 o successiva**. Ogni email accetta i campi di `emails.send()` tranne
+`scheduledAt` e gli allegati; il secondo argomento, facoltativo, è la
+[chiave di idempotenza](/it/docs/idempotency), che vale per tutto il batch.
+
+```typescript
+const batch = await tratto.emails.sendBatch(
+  [
+    { from: 'hello@yourdomain.com', to: 'alice@example.com', subject: 'La tua ricevuta', text: 'Grazie, Alice.' },
+    { from: 'hello@yourdomain.com', to: 'bob@example.com', subject: 'La tua ricevuta', text: 'Grazie, Bob.' },
+  ],
+  crypto.randomUUID(),
+);
+
+console.log(`${batch.accepted} in coda, ${batch.failed} non inviate`);
+for (const e of batch.emails) {
+  if (e.status === 'failed') console.error(e.to, e.error.code, e.error.message);
+}
+```
+
+La chiamata si risolve a ogni 202, **anche quando alcune email non sono
+partite**: un'email non partita non ha `id`. Invia di nuovo solo quelle, in un
+nuovo batch con una **nuova** chiave. Dopo un 503 o un 500 non è partito
+niente: ripeti la stessa chiamata con la **stessa** chiave. Quota, limiti ed
+errori sono in [Invio in Batch](/it/docs/send-batch).
+
 ## Leggi lo Status di un'Email
 
 ```typescript
@@ -288,7 +316,7 @@ l'API li rifiuta per una chiave in modalità test.
 
 ## Gestione degli Errori
 
-`TrattoError` espone `code`, `statusCode` e `docs`:
+`TrattoError` espone `code`, `statusCode`, `docs` e `details`:
 
 ```typescript
 import { Tratto, TrattoError } from '@tratto/email';
@@ -311,6 +339,11 @@ try {
 ```
 
 Vedi [Codici di Errore](/it/docs/error-codes) per l'elenco completo.
+
+Su un 422 `VALIDATION_ERROR`, `details` indica quale campo è sbagliato, per
+esempio `[{ path: '/emails/3/to', message: '...' }]` per la quarta email di un
+batch. Richiede la **1.6.0 o successiva** e vale `undefined` quando l'API non
+lo invia.
 
 ## Cosa l'SDK non copre ancora
 

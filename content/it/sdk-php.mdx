@@ -98,7 +98,7 @@ $tratto->emails->send([
 Il secondo argomento di `emails->send` è la
 [chiave di idempotenza](/it/docs/idempotency): entro 24 ore, ripetere la chiamata
 con la stessa chiave restituisce la risposta originale invece di inviare di
-nuovo (best-effort). Solo `emails->send` la accetta, e una
+nuovo (best-effort). `emails->send` e `emails->sendBatch` la accettano, e una
 chiave che contiene un a capo viene rifiutata prima dell'invio.
 
 ```php
@@ -117,6 +117,38 @@ In PHP `[]` è sia una lista vuota sia un oggetto vuoto, e un array annidato
 vuoto parte come array JSON. Per i campi che sono oggetti, come `variables` o
 `headers`, ometti il campo oppure passa `new \stdClass()`.
 </Callout>
+
+## Invia un Batch
+
+`emails->sendBatch()` invia da 1 a 100 email in una sola richiesta e richiede
+la **1.1.0 o successiva**. Ogni email accetta i campi di `send()` tranne
+`scheduledAt` e `attachments`; il secondo argomento è la chiave di
+idempotenza, che vale per tutto il batch.
+
+```php
+$emails = [
+    ['from' => 'hello@yourdomain.com', 'to' => ['alice@example.com'], 'subject' => 'La tua ricevuta', 'text' => 'Grazie, Alice.'],
+    ['from' => 'hello@yourdomain.com', 'to' => ['bob@example.com'], 'subject' => 'La tua ricevuta', 'text' => 'Grazie, Bob.'],
+];
+$batch = $tratto->emails->sendBatch($emails, 'receipts-2026-10-21');
+
+// Reinvia solo le email non partite, in un nuovo batch con una nuova chiave.
+$failed = [];
+foreach ($batch['emails'] as $i => $result) {
+    if ($result['status'] === 'failed') {
+        $failed[] = $emails[$i];
+    }
+}
+if ($failed !== []) {
+    $tratto->emails->sendBatch($failed, 'receipts-2026-10-21-retry-1');
+}
+```
+
+La risposta è sempre il 202, anche quando alcune email non sono partite:
+controlla `failed`. I risultati sono nell'ordine della richiesta, e un'email
+non partita non ha `id` ma un `error` con `code` e `message`. Dopo un 503 o un
+500 non è partito niente: ripeti lo stesso batch con la stessa chiave. Quota,
+limiti ed errori sono in [Invio in Batch](/it/docs/send-batch).
 
 ## Stato e Timeline di un'Email
 
@@ -177,6 +209,7 @@ try {
 | `statusCode` | `int` | Lo status HTTP (anche `getCode()`), 0 se non è arrivata alcuna risposta |
 | `suggestion` | `?string` | Cosa fare, nelle parole dell'API; `null` se la risposta non lo contiene |
 | `docs` | `?string` | Link alla pagina che spiega il codice; `null` se la risposta non lo contiene |
+| `details` | `?array` | I `details` dell'API così come sono, per esempio la lista di un 422 `['path' => '/emails/3/to', 'message' => ...]`; `null` se assenti. Richiede la 1.1.0 o successiva |
 
 `errorCode` è lo stesso codice elencato in [Codici di Errore](/it/docs/error-codes).
 L'SDK non ripete le chiamate. Per ripetere un invio in sicurezza, passa la

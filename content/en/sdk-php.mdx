@@ -96,7 +96,7 @@ $tratto->emails->send([
 
 The second argument of `emails->send` is the
 [idempotency key](/en/docs/idempotency): within 24 hours, retrying with the same key returns the
-original response instead of sending again (best-effort). Only `emails->send` takes one, and a key containing a line break is
+original response instead of sending again (best-effort). `emails->send` and `emails->sendBatch` take one, and a key containing a line break is
 rejected before sending.
 
 ```php
@@ -115,6 +115,38 @@ In PHP `[]` is both an empty list and an empty object, and an empty nested
 array goes out as a JSON array. For fields that are objects, such as
 `variables` or `headers`, omit the field or pass `new \stdClass()`.
 </Callout>
+
+## Send a Batch
+
+`emails->sendBatch()` sends 1 to 100 emails in one request and requires
+**1.1.0 or newer**. Each email takes the fields of `send()` except
+`scheduledAt` and `attachments`; the second argument is the idempotency key,
+which covers the whole batch.
+
+```php
+$emails = [
+    ['from' => 'hello@yourdomain.com', 'to' => ['alice@example.com'], 'subject' => 'Your receipt', 'text' => 'Thanks, Alice.'],
+    ['from' => 'hello@yourdomain.com', 'to' => ['bob@example.com'], 'subject' => 'Your receipt', 'text' => 'Thanks, Bob.'],
+];
+$batch = $tratto->emails->sendBatch($emails, 'receipts-2026-10-21');
+
+// Resend only the failed emails, in a new batch with a new key.
+$failed = [];
+foreach ($batch['emails'] as $i => $result) {
+    if ($result['status'] === 'failed') {
+        $failed[] = $emails[$i];
+    }
+}
+if ($failed !== []) {
+    $tratto->emails->sendBatch($failed, 'receipts-2026-10-21-retry-1');
+}
+```
+
+The response is always the 202, even when some emails failed: check `failed`.
+Results are in the order of the request, and a failed email has no `id` but an
+`error` with `code` and `message`. After a 503 or a 500 nothing was sent:
+retry the same batch with the same key. Quota, limits and errors are in
+[Send a Batch](/en/docs/send-batch).
 
 ## Get Email Status and Timeline
 
@@ -175,6 +207,7 @@ try {
 | `statusCode` | `int` | The HTTP status (also `getCode()`), 0 when no response was received |
 | `suggestion` | `?string` | The API's own words on what to do, `null` when the response has none |
 | `docs` | `?string` | A link to the page that explains the code, `null` when the response has none |
+| `details` | `?array` | The API's `details` as they are, for example a 422's list of `['path' => '/emails/3/to', 'message' => ...]`; `null` when absent. Requires 1.1.0 or newer |
 
 `errorCode` is the same code listed in [Error Codes](/en/docs/error-codes).
 The SDK does not retry. To retry a send safely, pass the same idempotency key.

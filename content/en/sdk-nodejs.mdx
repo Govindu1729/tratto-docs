@@ -117,6 +117,33 @@ Canceling or rescheduling a scheduled email is available over
 [HTTP](/en/docs/sdk-http) but has no SDK method yet — see
 [What the SDK does not cover](#what-the-sdk-does-not-cover-yet).
 
+## Send a Batch
+
+`emails.sendBatch()` sends up to 100 emails in one request and requires
+**1.6.0 or newer**. Each email takes the fields of `emails.send()` except
+`scheduledAt` and attachments; the optional second argument is the
+[idempotency key](/en/docs/idempotency), which covers the whole batch.
+
+```typescript
+const batch = await tratto.emails.sendBatch(
+  [
+    { from: 'hello@yourdomain.com', to: 'alice@example.com', subject: 'Your receipt', text: 'Thanks, Alice.' },
+    { from: 'hello@yourdomain.com', to: 'bob@example.com', subject: 'Your receipt', text: 'Thanks, Bob.' },
+  ],
+  crypto.randomUUID(),
+);
+
+console.log(`${batch.accepted} queued, ${batch.failed} failed`);
+for (const e of batch.emails) {
+  if (e.status === 'failed') console.error(e.to, e.error.code, e.error.message);
+}
+```
+
+The call resolves on every 202, **also when some emails failed**: a failed
+email has no `id`. Send only those again, in a new batch with a **new** key.
+After a 503 or a 500 nothing was sent: repeat the same call with the **same**
+key. Quota, limits and errors are in [Send a Batch](/en/docs/send-batch).
+
 ## Get Email Status
 
 ```typescript
@@ -286,7 +313,7 @@ API rejects them for a test-mode key.
 
 ## Error Handling
 
-`TrattoError` carries `code`, `statusCode` and `docs`:
+`TrattoError` carries `code`, `statusCode`, `docs` and `details`:
 
 ```typescript
 import { Tratto, TrattoError } from '@tratto/email';
@@ -309,6 +336,10 @@ try {
 ```
 
 See [Error Codes](/en/docs/error-codes) for the full list.
+
+On a 422 `VALIDATION_ERROR`, `details` says which field is wrong, for example
+`[{ path: '/emails/3/to', message: '...' }]` for the fourth email of a batch.
+It requires **1.6.0 or newer** and is `undefined` when the API sends none.
 
 ## What the SDK does not cover yet
 
