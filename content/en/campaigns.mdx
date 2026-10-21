@@ -139,7 +139,9 @@ Test sends are free: they do not count against the
 API 0.24.0 or later, a workspace can make `{{TEST_SEND_DAILY_CAP}}` test sends per day,
 template and campaign test sends together, and the count resets at midnight
 UTC. Past the cap the API answers `429 QUOTA_EXCEEDED` and nothing is sent: do
-not retry before the reset.
+not retry before the reset. A call refused with `404` or `422` does not use
+the cap; an accepted call does, even if it then answers `503`, because the cap
+is taken before the email is handed to the queue.
 
 ```json
 {

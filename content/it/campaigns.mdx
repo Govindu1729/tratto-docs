@@ -142,7 +142,9 @@ I test-send sono gratuiti: non contano sulla
 destinatario. Con l'API 0.24.0 o successiva, un workspace può fare `{{TEST_SEND_DAILY_CAP}}`
 test-send al giorno, fra template e campagne insieme, e il conteggio si azzera
 a mezzanotte UTC. Oltre il tetto l'API risponde `429 QUOTA_EXCEEDED` e non
-parte niente: non riprovare prima dell'azzeramento.
+parte niente: non riprovare prima dell'azzeramento. Una chiamata rifiutata con
+`404` o `422` non consuma il tetto; una chiamata accettata sì, anche se poi
+risponde `503`, perché il tetto si conta prima della consegna alla coda.
 
 ```json
 {

@@ -404,8 +404,9 @@ Successivamente, filtra le email per tag o usali nei webhook.
 Con l'API 0.24.0 o successiva, un campo che non è in questa tabella fallisce
 con `422 VALIDATION_ERROR` e non parte niente. I nomi distinguono maiuscole e
 minuscole e sono in camelCase, quindi `reply_to` o `scheduled_at` sono campi
-sconosciuti. Ogni voce di `details` nomina il campo in `message`; per un campo
-al primo livello del body, `path` è `/`:
+sconosciuti. La voce di `details` nomina in `message` il campo o i campi sconosciuti; per i
+campi al primo livello del body, `path` è `/` e c'è una sola voce per tutti
+(`Unrecognized keys: "reply_to", "foo"`):
 
 ```json
 {

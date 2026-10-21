@@ -401,9 +401,10 @@ Later, filter emails by tags or use them in webhooks.
 
 With API 0.24.0 or later, a field that is not in this table fails with
 `422 VALIDATION_ERROR` and nothing is sent. Names are case-sensitive and
-camelCase, so `reply_to` or `scheduled_at` are unknown fields. Each entry in
-`details` names the field in `message`; for a field at the top level of the
-body, `path` is `/`:
+camelCase, so `reply_to` or `scheduled_at` are unknown fields. The entry in
+`details` names the unknown field, or fields, in `message`; for fields at the
+top level of the body, `path` is `/` and there is one entry for all of them
+(`Unrecognized keys: "reply_to", "foo"`):
 
 ```json
 {
