@@ -116,11 +116,16 @@ array goes out as a JSON array. For fields that are objects, such as
 `variables` or `headers`, omit the field or pass `new \stdClass()`.
 </Callout>
 
+The array is sent as it is, so keys must match the API's camelCase field
+names. With API 0.24.0 or later, a key the API does not know, such as
+`reply_to` or `attachments`, fails with `422 VALIDATION_ERROR` instead of being
+dropped. See [Unknown fields](/en/docs/send-email#unknown-fields).
+
 ## Send a Batch
 
 `emails->sendBatch()` sends 1 to 100 emails in one request and requires
 **1.1.0 or newer**. Each email takes the fields of `send()` except
-`scheduledAt` and `attachments`; the second argument is the idempotency key,
+`scheduledAt`; the second argument is the idempotency key,
 which covers the whole batch.
 
 ```php

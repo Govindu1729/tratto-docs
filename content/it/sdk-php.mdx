@@ -118,11 +118,17 @@ vuoto parte come array JSON. Per i campi che sono oggetti, come `variables` o
 `headers`, ometti il campo oppure passa `new \stdClass()`.
 </Callout>
 
+L'array parte così com'è, quindi le chiavi devono corrispondere ai nomi dei
+campi dell'API, in camelCase. Con l'API 0.24.0 o successiva, una chiave che
+l'API non conosce, come `reply_to` o `attachments`, fallisce con
+`422 VALIDATION_ERROR` invece di essere scartata. Vedi
+[Campi sconosciuti](/it/docs/send-email#campi-sconosciuti).
+
 ## Invia un Batch
 
 `emails->sendBatch()` invia da 1 a 100 email in una sola richiesta e richiede
 la **1.1.0 o successiva**. Ogni email accetta i campi di `send()` tranne
-`scheduledAt` e `attachments`; il secondo argomento è la chiave di
+`scheduledAt`; il secondo argomento è la chiave di
 idempotenza, che vale per tutto il batch.
 
 ```php

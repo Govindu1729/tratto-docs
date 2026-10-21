@@ -135,6 +135,26 @@ Se Tratto non riesce a mettere in coda l'email di test, l'API restituisce
 è stata creata alcuna email, quindi puoi riprovare. Vedi
 [Codici di Errore](/it/docs/error-codes).
 
+### Gratis, con un tetto giornaliero
+
+I test-send sono gratuiti: non contano sulla
+[quota mensile](/it/docs/rate-limits). Ogni chiamata invia a un solo
+destinatario. Con l'API 0.24.0 o successiva, un workspace può fare `{{TEST_SEND_DAILY_CAP}}`
+test-send al giorno, fra template e campagne insieme, e il conteggio si azzera
+a mezzanotte UTC. Oltre il tetto l'API risponde `429 QUOTA_EXCEEDED` e non
+parte niente: non riprovare prima dell'azzeramento.
+
+```json
+{
+  "error": {
+    "code": "QUOTA_EXCEEDED",
+    "message": "Test send daily limit of {{TEST_SEND_DAILY_CAP}} per workspace reached.",
+    "suggestion": "The limit resets at midnight UTC. Test sends are free and do not count against your monthly quota.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes"
+  }
+}
+```
+
 ## Invia Immediatamente
 
 Invia la campagna a tutti i contatti nell'audience proprio adesso.

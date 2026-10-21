@@ -65,10 +65,10 @@ Rules for each email of the batch:
 - It accepts every field of [`POST /v1/emails`](/en/docs/send-email#full-request-body-reference)
   except `scheduledAt`. To schedule, send the email on its own with
   `POST /v1/emails`.
-- `attachments` is not accepted: it fails with 422 (on `POST /v1/emails` it is
-  ignored instead).
+- `attachments` is not accepted: it fails with 422.
 - An unknown field fails with 422: both the body and each email are checked
-  strictly.
+  strictly. `POST /v1/emails` does the same with API 0.24.0 or later, see
+  [Unknown fields](/en/docs/send-email#unknown-fields).
 - At most 50 distinct recipients across `to`, `cc` and `bcc`, as on a single
   send. See [Recipients](/en/docs/send-email#recipients-to-cc-and-bcc).
 

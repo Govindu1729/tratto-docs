@@ -327,7 +327,9 @@ curl -X DELETE https://api.tratto.email/v1/emails/email_abc123xyz \
 moves an email that is still `scheduled`. Within the same UTC month nothing
 changes on the quota. Into another month the units move with the email: if
 the destination month has fewer recipients left than the email has, the API answers `429 QUOTA_EXCEEDED` and the
-email stays as it was.
+email stays as it was. The body takes only `scheduledAt`: with API 0.24.0 or
+later any other field fails with `422 VALIDATION_ERROR` and the email is not
+changed (see [Unknown fields](#unknown-fields)).
 
 ```bash
 curl -X PATCH https://api.tratto.email/v1/emails/email_abc123xyz \
@@ -350,8 +352,11 @@ HTTP as shown above.
 ## Attachments
 
 Attachments are not supported yet: `POST /v1/emails` has no `attachments`
-field. If you send one, the API ignores it and the email goes out without the
-file, with no error. Attachments are on the roadmap. Until then, link to the
+field. With API 0.24.0 or later, a request that sends one fails with
+`422 VALIDATION_ERROR` on path `/attachments`, with the message
+`attachments are not supported yet.`, and nothing is sent. Earlier versions
+ignored the field and sent the email without the file. Attachments are on the
+roadmap. Until then, link to the
 file from the email body instead.
 
 ## Tags for Organization
@@ -391,6 +396,32 @@ Later, filter emails by tags or use them in webhooks.
 | `tags` | string[] | | Organization tags |
 | `replyTo` | string | | Reply-to address. If omitted on a request without `from`, the `replyTo` of the transactional sender applies |
 | `headers` | object | | Custom email headers (advanced) |
+
+### Unknown fields
+
+With API 0.24.0 or later, a field that is not in this table fails with
+`422 VALIDATION_ERROR` and nothing is sent. Names are case-sensitive and
+camelCase, so `reply_to` or `scheduled_at` are unknown fields. Each entry in
+`details` names the field in `message`; for a field at the top level of the
+body, `path` is `/`:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes",
+    "details": [
+      { "path": "/", "message": "Unrecognized key: \"reply_to\"" }
+    ]
+  }
+}
+```
+
+Earlier versions dropped unknown fields and accepted the email with `202`, so
+a misspelt `replyTo` went out without its reply-to address. The same check
+applies to [`PATCH /v1/emails/{id}`](#reschedule-a-scheduled-email) and has
+always applied to [batches](/en/docs/send-batch).
 
 ## Response
 
@@ -464,7 +495,9 @@ reuse the same key. See [Idempotency](/en/docs/idempotency).
 ### VALIDATION_ERROR
 
 **Cause:** Invalid request (missing required field, malformed JSON, more than
-50 distinct recipients across `to`, `cc` and `bcc`, etc.).
+50 distinct recipients across `to`, `cc` and `bcc`, an
+[unknown field](#unknown-fields) or `attachments` with API 0.24.0 or later,
+etc.).
 
 **Fix:** Check the error message and refer to the [Error Codes](/en/docs/error-codes) reference.
 

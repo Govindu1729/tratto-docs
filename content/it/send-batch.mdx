@@ -65,10 +65,10 @@ Regole per ogni email del batch:
 - Accetta tutti i campi di [`POST /v1/emails`](/it/docs/send-email#riferimento-completo-del-request-body)
   tranne `scheduledAt`. Per programmare un invio, manda l'email da sola con
   `POST /v1/emails`.
-- `attachments` non è accettato: risponde 422 (su `POST /v1/emails` invece
-  viene ignorato).
+- `attachments` non è accettato: risponde 422.
 - Un campo sconosciuto risponde 422: sia il body sia ogni email sono
-  controllati in modo stretto.
+  controllati in modo stretto. `POST /v1/emails` fa lo stesso con l'API 0.24.0
+  o successiva, vedi [Campi sconosciuti](/it/docs/send-email#campi-sconosciuti).
 - Al massimo 50 destinatari distinti fra `to`, `cc` e `bcc`, come per un invio
   singolo. Vedi [Destinatari](/it/docs/send-email#destinatari-to-cc-e-bcc).
 
