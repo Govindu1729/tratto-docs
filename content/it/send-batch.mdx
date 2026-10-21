@@ -7,8 +7,8 @@ description: Invia fino a 100 email in una sola chiamata con POST /v1/emails/bat
 email è indipendente: ha il suo mittente, i suoi destinatari, il suo oggetto e
 il suo contenuto, con gli stessi campi di [`POST /v1/emails`](/it/docs/send-email).
 
-Richiede l'API 0.22.0 o successiva. Gli SDK non hanno ancora un metodo per il
-batch: chiama l'API via HTTP come negli esempi qui sotto.
+Richiede l'API 0.22.0 o successiva. Anche gli SDK hanno un metodo per il
+batch: vedi [Con gli SDK](#con-gli-sdk).
 
 ## Richiesta
 
@@ -40,12 +40,14 @@ curl -X POST https://api.tratto.email/v1/emails/batch \
 ```
 
 ```javascript
+import { randomUUID } from 'node:crypto';
+
 const response = await fetch('https://api.tratto.email/v1/emails/batch', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer tratto_live_...',
     'Content-Type': 'application/json',
-    'Idempotency-Key': crypto.randomUUID(),
+    'Idempotency-Key': randomUUID(),
   },
   body: JSON.stringify({
     emails: [
@@ -205,6 +207,93 @@ riusare, perché nessuna email del batch è partita.
 
 Dopo un 500 nessuna email del batch è partita, ma il batch può contare sulla
 quota mensile. Rimandalo: la stessa `Idempotency-Key` si può riusare.
+
+## Con gli SDK
+
+Ogni SDK invia il batch con una sola chiamata. La chiamata restituisce la
+risposta 202, **anche quando alcune email non sono partite**: controlla
+`failed` e lo `status` di ogni email. Gli errori (422, 429, 503, 500 e gli
+altri in [Errori](#errori)) arrivano come eccezioni, e su un 422 il campo
+`details` dell'eccezione indica l'email con la sua posizione, come in
+`/emails/3/to`. Gli SDK non ripetono le chiamate: segui le regole qui sopra,
+la stessa chiave dopo un 503 o un 500, una nuova chiave per le email non
+partite.
+
+### Node.js
+
+`emails.sendBatch(emails, idempotencyKey?)` richiede `@tratto/email` 1.6.0 o
+successiva. Vedi l'[SDK Node.js](/it/docs/sdk-nodejs#invia-un-batch).
+
+```typescript
+import { randomUUID } from 'node:crypto';
+import { Tratto } from '@tratto/email';
+
+const tratto = new Tratto(process.env.TRATTO_API_KEY!);
+
+const batch = await tratto.emails.sendBatch(
+  [
+    { from: 'hello@yourdomain.com', to: 'alice@example.com', subject: 'La tua ricevuta', text: 'Grazie, Alice.' },
+    { from: 'hello@yourdomain.com', to: 'bob@example.com', subject: 'La tua ricevuta', text: 'Grazie, Bob.' },
+  ],
+  randomUUID(),
+);
+
+console.log(`${batch.accepted} in coda, ${batch.failed} non inviate`);
+for (const e of batch.emails) {
+  if (e.status === 'failed') console.error(e.to, e.error.code, e.error.message);
+}
+```
+
+### Python
+
+`emails.send_batch(emails, *, idempotency_key=None)` richiede `tratto-email`
+2.1.0 o successiva. La chiave va sulla chiamata: un'email con un suo
+`idempotency_key` solleva `ValueError`. Vedi l'
+[SDK Python](/it/docs/sdk-python#invia-un-batch).
+
+```python
+import uuid
+from tratto import SendEmailOptions, Tratto
+
+client = Tratto('tratto_live_...')
+
+result = client.emails.send_batch(
+    [
+        SendEmailOptions(from_='hello@yourdomain.com', to='alice@example.com', subject='La tua ricevuta', text='Grazie, Alice.'),
+        SendEmailOptions(from_='hello@yourdomain.com', to='bob@example.com', subject='La tua ricevuta', text='Grazie, Bob.'),
+    ],
+    idempotency_key=str(uuid.uuid4()),
+)
+
+print(result['accepted'], result['failed'])
+for item in result['emails']:  # stesso ordine della richiesta
+    if item['status'] == 'failed':
+        print(item['to'], item['error']['code'])
+```
+
+### PHP
+
+`emails->sendBatch(array $emails, ?string $idempotencyKey = null)` richiede
+`tratto/email` 1.1.0 o successiva. Vedi l'[SDK PHP](/it/docs/sdk-php#invia-un-batch).
+
+```php
+$emails = [
+    ['from' => 'hello@yourdomain.com', 'to' => ['alice@example.com'], 'subject' => 'La tua ricevuta', 'text' => 'Grazie, Alice.'],
+    ['from' => 'hello@yourdomain.com', 'to' => ['bob@example.com'], 'subject' => 'La tua ricevuta', 'text' => 'Grazie, Bob.'],
+];
+$batch = $tratto->emails->sendBatch($emails, 'receipts-2026-10-21');
+
+// Reinvia solo le email non partite, in un nuovo batch con una nuova chiave.
+$failed = [];
+foreach ($batch['emails'] as $i => $result) {
+    if ($result['status'] === 'failed') {
+        $failed[] = $emails[$i];
+    }
+}
+if ($failed !== []) {
+    $tratto->emails->sendBatch($failed, 'receipts-2026-10-21-retry-1');
+}
+```
 
 ## Prossimi Passi
 
