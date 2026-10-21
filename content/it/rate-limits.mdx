@@ -141,6 +141,9 @@ La generazione di template con l'AI nella dashboard ha una dotazione a sé,
 **50 generazioni al mese** su ogni piano, azzerata alle 00:00 UTC del primo
 giorno del mese.
 
+I webhook sono inclusi da **Starter** in su (Starter e Growth), non nel
+Free: vedi [Piani che includono i webhook](/it/docs/webhooks#piani-che-includono-i-webhook).
+
 ### I tetti sono dell'account, non del workspace
 
 Il piano appartiene all'**account**, la persona proprietaria del workspace, e
@@ -196,7 +199,9 @@ dell'**account**
 proprietario del workspace, condivisi con i suoi altri workspace, non una
 dotazione di questo solo workspace. `limits.membersPerWorkspace` è il numero di
 persone che ogni workspace può avere, inviti in attesa compresi (vedi
-[Team](/it/docs/team#quante-persone-ammette-ogni-piano)):
+[Team](/it/docs/team#quante-persone-ammette-ogni-piano)). `limits.webhooks` dice
+se il piano del workspace include i webhook (richiede l'API 0.23.0 o
+successiva, vedi [Webhook](/it/docs/webhooks#piani-che-includono-i-webhook)):
 
 ```bash
 curl https://api.tratto.email/v1/workspace \
@@ -207,7 +212,7 @@ curl https://api.tratto.email/v1/workspace \
 {
   "data": {
     "plan": "free",
-    "limits": { "emailsPerMonth": 3000, "domains": 3, "membersPerWorkspace": 1 }
+    "limits": { "domains": 3, "emailsPerMonth": 3000, "membersPerWorkspace": 1, "workspaces": 1, "webhooks": false }
   }
 }
 ```

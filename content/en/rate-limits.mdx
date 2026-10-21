@@ -138,6 +138,9 @@ recipients: see [Recipients](/en/docs/send-email#recipients-to-cc-and-bcc).
 AI template generation in the dashboard has an allowance of its own, **50
 generations per month** on every plan, reset at 00:00 UTC on the 1st.
 
+Webhooks are included from **Starter** onward (Starter and Growth), not on
+Free: see [Plan availability](/en/docs/webhooks#plan-availability).
+
 ### The caps belong to the account, not the workspace
 
 The plan belongs to the **account**, the person who owns the workspace, and
@@ -190,7 +193,9 @@ that are actually enforced, and `null` means no limit. `limits.emailsPerMonth`
 counting as one) and `limits.domains` are the caps of the **account** that owns the workspace,
 shared with its other workspaces, not an allowance of this workspace alone.
 `limits.membersPerWorkspace` is the number of people each workspace can have,
-counting pending invites (see [Team](/en/docs/team#how-many-people-each-plan-allows)):
+counting pending invites (see [Team](/en/docs/team#how-many-people-each-plan-allows)).
+`limits.webhooks` says whether the workspace's plan includes webhooks
+(requires API 0.23.0 or later, see [Webhooks](/en/docs/webhooks#plan-availability)):
 
 ```bash
 curl https://api.tratto.email/v1/workspace \
@@ -201,7 +206,7 @@ curl https://api.tratto.email/v1/workspace \
 {
   "data": {
     "plan": "free",
-    "limits": { "emailsPerMonth": 3000, "domains": 3, "membersPerWorkspace": 1 }
+    "limits": { "domains": 3, "emailsPerMonth": 3000, "membersPerWorkspace": 1, "workspaces": 1, "webhooks": false }
   }
 }
 ```
