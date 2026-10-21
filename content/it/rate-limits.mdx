@@ -141,6 +141,11 @@ La generazione di template con l'AI nella dashboard ha una dotazione a sé,
 **50 generazioni al mese** su ogni piano, azzerata alle 00:00 UTC del primo
 giorno del mese.
 
+I test-send di template e campagne sono gratuiti e hanno un tetto giornaliero
+a sé, contato **per workspace** e azzerato a mezzanotte UTC (richiede l'API
+0.24.0 o successiva): **20 al giorno** su Free, **100 al giorno** su Starter e
+Growth. Vedi [Test-send](/it/docs/templates#gratis-con-un-tetto-giornaliero).
+
 I webhook sono inclusi da **Starter** in su (Starter e Growth), non nel
 Free: vedi [Piani che includono i webhook](/it/docs/webhooks#piani-che-includono-i-webhook).
 
@@ -201,7 +206,10 @@ dotazione di questo solo workspace. `limits.membersPerWorkspace` è il numero di
 persone che ogni workspace può avere, inviti in attesa compresi (vedi
 [Team](/it/docs/team#quante-persone-ammette-ogni-piano)). `limits.webhooks` dice
 se il piano del workspace include i webhook (richiede l'API 0.23.0 o
-successiva, vedi [Webhook](/it/docs/webhooks#piani-che-includono-i-webhook)):
+successiva, vedi [Webhook](/it/docs/webhooks#piani-che-includono-i-webhook)).
+`limits.testSendsPerDay` è il tetto giornaliero di test-send di questo
+workspace, fra template e campagne insieme, azzerato a mezzanotte UTC (richiede
+l'API 0.24.0 o successiva):
 
 ```bash
 curl https://api.tratto.email/v1/workspace \
@@ -212,7 +220,7 @@ curl https://api.tratto.email/v1/workspace \
 {
   "data": {
     "plan": "free",
-    "limits": { "domains": 3, "emailsPerMonth": 3000, "membersPerWorkspace": 1, "workspaces": 1, "webhooks": false }
+    "limits": { "domains": 3, "emailsPerMonth": 3000, "membersPerWorkspace": 1, "workspaces": 1, "webhooks": false, "testSendsPerDay": 20 }
   }
 }
 ```
