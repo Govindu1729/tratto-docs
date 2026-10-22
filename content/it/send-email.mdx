@@ -329,7 +329,9 @@ curl -X DELETE https://api.tratto.email/v1/emails/email_abc123xyz \
 futuro, sposta un'email ancora `scheduled`. Nello stesso mese UTC la quota non
 cambia. In un altro mese le unità si spostano con l'email: se nel mese di
 destinazione restano meno destinatari di quanti ne ha l'email, l'API risponde `429 QUOTA_EXCEEDED` e l'email resta
-com'era.
+com'era. Il body accetta solo `scheduledAt`: con l'API 0.24.0 o successiva
+qualunque altro campo fallisce con `422 VALIDATION_ERROR` e l'email non cambia
+(vedi [Campi sconosciuti](#campi-sconosciuti)).
 
 ```bash
 curl -X PATCH https://api.tratto.email/v1/emails/email_abc123xyz \
@@ -352,8 +354,11 @@ via HTTP come negli esempi qui sopra.
 ## Allegati
 
 Gli allegati non sono ancora supportati: `POST /v1/emails` non ha un campo
-`attachments`. Se lo invii, l'API lo ignora e l'email parte senza il file,
-senza alcun errore. Gli allegati sono in roadmap. Nel frattempo, metti nel
+`attachments`. Con l'API 0.24.0 o successiva, una richiesta che lo invia
+fallisce con `422 VALIDATION_ERROR` sul path `/attachments`, con il messaggio
+`attachments are not supported yet.`, e non parte niente. Le versioni
+precedenti ignoravano il campo e inviavano l'email senza il file. Gli allegati
+sono in roadmap. Nel frattempo, metti nel
 corpo dell'email un link al file.
 
 ## Tag per l'Organizzazione
@@ -393,6 +398,34 @@ Successivamente, filtra le email per tag o usali nei webhook.
 | `tags` | string[] | | Tag di organizzazione |
 | `replyTo` | string | | Indirizzo di risposta. Se omesso in una richiesta senza `from`, si applica il `replyTo` del mittente transazionale |
 | `headers` | object | | Custom email headers (avanzato) |
+
+### Campi sconosciuti
+
+Con l'API 0.24.0 o successiva, un campo che non è in questa tabella fallisce
+con `422 VALIDATION_ERROR` e non parte niente. I nomi distinguono maiuscole e
+minuscole e sono in camelCase, quindi `reply_to` o `scheduled_at` sono campi
+sconosciuti. La voce di `details` nomina in `message` il campo o i campi sconosciuti; per i
+campi al primo livello del body, `path` è `/` e c'è una sola voce per tutti
+(`Unrecognized keys: "reply_to", "foo"`):
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes",
+    "details": [
+      { "path": "/", "message": "Unrecognized key: \"reply_to\"" }
+    ]
+  }
+}
+```
+
+Le versioni precedenti scartavano i campi sconosciuti e accettavano l'email
+con `202`, quindi un `replyTo` scritto male partiva senza indirizzo di
+risposta. Lo stesso controllo vale per
+[`PATCH /v1/emails/{id}`](#riprogrammare-unemail-programmata) e vale da sempre
+per i [batch](/it/docs/send-batch).
 
 ## Risposta
 
@@ -467,7 +500,9 @@ risponde `202`.
 ### VALIDATION_ERROR
 
 **Causa:** Richiesta non valida (campo mancante, JSON malformato, più di 50
-destinatari distinti fra `to`, `cc` e `bcc`, ecc.).
+destinatari distinti fra `to`, `cc` e `bcc`, un
+[campo sconosciuto](#campi-sconosciuti) o `attachments` con l'API 0.24.0 o
+successiva, ecc.).
 
 **Fix:** Controlla il messaggio di errore e consulta il riferimento [Codici di Errore](/it/docs/error-codes).
 

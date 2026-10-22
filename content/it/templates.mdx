@@ -311,6 +311,28 @@ valori di anteprima: `email` è l'indirizzo di test, `firstName` è `Preview`,
 disiscrive nessuno. Ogni altra variabile che ometti diventa vuota, come in un
 invio reale.
 
+### Gratis, con un tetto giornaliero
+
+I test-send sono gratuiti: non contano sulla
+[quota mensile](/it/docs/rate-limits). Ogni chiamata invia a un solo
+destinatario. Con l'API 0.24.0 o successiva, un workspace può fare 20
+test-send al giorno su Free e 100 su Starter e Growth, fra template e campagne insieme, e il conteggio si azzera
+a mezzanotte UTC. Oltre il tetto l'API risponde `429 QUOTA_EXCEEDED` e non
+parte niente: non riprovare prima dell'azzeramento. Una chiamata rifiutata con
+`404` o `422` non consuma il tetto; una chiamata accettata sì, anche se poi
+risponde `503`, perché il tetto si conta prima della consegna alla coda.
+
+```json
+{
+  "error": {
+    "code": "QUOTA_EXCEEDED",
+    "message": "Test send daily limit of 20 per workspace reached.",
+    "suggestion": "The limit resets at midnight UTC. Test sends are free and do not count against your monthly quota. Starter raises the test-send limit to 100 a day. The account owner can upgrade at https://app.tratto.email/settings/billing.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes"
+  }
+}
+```
+
 ## Elenca i Template
 
 Ottieni tutti i template per il tuo tenant.
