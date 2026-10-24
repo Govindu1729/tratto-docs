@@ -10,7 +10,7 @@ Every workspace has two key environments, Stripe-style:
 |---|---|---|
 | Delivery | **Simulated** — nothing is ever sent | Real, via our sending infrastructure |
 | Sender domain | Any syntactically valid address | Must be a verified domain |
-| Monthly quota | Untouched (own cap: 100 test recipients/day) | Counts against your plan |
+| Monthly quota | Untouched (own cap: 100 test emails/day, each recipient counts as one) | Counts against your plan |
 | Statuses, timeline, webhooks | Identical to live | — |
 | Data visibility | A test key sees only test data | A live key sees only live data |
 | Retention | Deleted 7 days after creation | Deleted 90 days after sending, on every plan |
@@ -95,9 +95,9 @@ status, or campaign statistics.
 
 ## Daily cap
 
-Test mode has a cap of its own: **100 recipients per day**, reset at midnight
-UTC (requires API 0.21.0 or later). As with the monthly quota, every distinct
-address in `to`, `cc` and `bcc` counts. An email that would go over the cap is
+Test mode has a cap of its own: **100 test emails per day**, reset at midnight
+UTC (requires API 0.21.0 or later). As with the monthly quota, each distinct
+address in `to`, `cc` and `bcc` counts as one email. An email that would go over the cap is
 refused whole with `429 QUOTA_EXCEEDED`, and a refused email does not use the
 cap:
 
@@ -105,7 +105,7 @@ cap:
 {
   "error": {
     "code": "QUOTA_EXCEEDED",
-    "message": "Test mode daily limit of 100 recipients reached: this email has 3, and every distinct address in to, cc and bcc counts.",
+    "message": "Test mode daily limit of 100 emails reached: this email has 3 recipients, and each distinct address in to, cc and bcc counts as one email.",
     "docs": "https://docs.tratto.email/en/docs/error-codes"
   }
 }

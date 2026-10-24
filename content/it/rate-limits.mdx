@@ -36,8 +36,7 @@ Un [invio in batch](/it/docs/send-batch) conta come una richiesta sul limite
 di 100/secondo, qualunque sia il numero di email che contiene, e conta anche
 sul suo limite di 10 chiamate batch al secondo per chiave. Oltre, il 429 ha
 `Retry-After: 1` e il messaggio `Rate limit exceeded: 10 batch requests/second per API key.`
-Sulla quota mensile conta ogni email del batch, un'unità per destinatario
-distinto.
+Sulla quota mensile di email conta ogni email del batch, un'email per destinatario distinto.
 
 ## Header di Rate Limit
 
@@ -123,20 +122,18 @@ async function sendWithRetry(url, options, maxRetries = 3) {
 
 Ogni piano ha due tetti:
 
-| Piano | Destinatari al mese | Domini |
+| Piano | Email al mese | Domini |
 |---|---|---|
 | Free | 3.000 | 3 |
 | Starter | 75.000 | 10 |
 | Growth | 300.000 | 100 |
 | Scale | 1.500.000 | 250 |
 
-La quota mensile conta i **destinatari**, non le email (richiede l'API 0.21.0
-o successiva): ogni indirizzo distinto in `to`, `cc` e `bcc` di un'email
-consuma un'unità, ignorando maiuscole e minuscole, e un indirizzo ripetuto
-nella stessa email conta una volta sola. Un'email a una persona consuma
-un'unità, un'email a tre persone distinte ne consuma tre. Una campagna o un
-flusso inviano un'email per destinatario, quindi per loro un destinatario resta
-un'email. Un'email può avere al massimo 50 destinatari distinti: vedi
+La quota mensile è in **email**, e ogni destinatario distinto conta come un'email (richiede l'API 0.21.0
+o successiva): ogni indirizzo distinto in `to`, `cc` e `bcc` di un'email conta uno, ignorando maiuscole e
+minuscole, e un indirizzo ripetuto nella stessa email conta una volta sola. Un'email a una persona conta
+come un'email, un'email a tre persone distinte conta come tre. Una campagna o un flusso inviano un'email
+per destinatario, quindi per loro il conteggio è il numero di email inviate. Un'email può avere al massimo 50 destinatari distinti: vedi
 [Destinatari](/it/docs/send-email#destinatari-to-cc-e-bcc).
 
 La generazione di template con l'AI nella dashboard ha una dotazione a sé,
@@ -167,20 +164,20 @@ proprietario o da un membro, consumano la stessa dotazione. Un
 altro workspace dello stesso account o da un altro membro.
 
 **Non esiste un tetto giornaliero** legato al piano. L'unico limite giornaliero
-del prodotto è quello del test mode, 100 destinatari di test al giorno, vedi
+del prodotto è quello del test mode, 100 email di test al giorno (ogni destinatario conta uno), vedi
 [Test Mode](/it/docs/test-mode).
 
-Quando un'email ha più destinatari di quanti ne restano all'account, la
+Quando un'email ha più destinatari distinti delle email che restano all'account, la
 richiesta fallisce con `QUOTA_EXCEEDED`, anch'esso 429, e non parte niente: il
 controllo è tutto o niente. A differenza di `RATE_LIMITED` non si risolve riprovando: vedi
 [Codici di Errore](/it/docs/error-codes).
 
 Un'email programmata conta nel mese UTC per cui è programmata, non in quello
 in cui l'hai creata. Il contatore di un mese, quello che viene confrontato col
-limite e che la dashboard mostra come **Destinatari usati questo mese**, include i
-destinatari delle email live programmate per quel mese, già partite o ancora
-in attesa. Annullare un'email programmata restituisce le sue unità, e
-riprogrammarla in un altro mese sposta le unità: vedi
+limite e che la dashboard mostra come **Email usate questo mese**, include le email live programmate per quel mese, una per
+destinatario distinto, già partite o ancora
+in attesa. Annullare un'email programmata restituisce la sua quota, e
+riprogrammarla in un altro mese sposta la quota: vedi
 [Quota delle email programmate](/it/docs/send-email#quota-delle-email-programmate).
 
 Il limite di domini conta tutti i domini di tutti i workspace dell'account,
@@ -205,8 +202,8 @@ da eliminare. Oltre il tetto l'API risponde `429 QUOTA_EXCEEDED`:
 
 Non scrivere a mano i numeri qui sopra. `GET /v1/workspace` restituisce i
 limiti realmente applicati, dove `null` significa nessun limite.
-`limits.emailsPerMonth` (destinatari per mese UTC, dove ogni indirizzo
-distinto in `to`, `cc` e `bcc` conta uno) e `limits.domains` sono i tetti
+`limits.emailsPerMonth` (email per mese UTC, dove ogni indirizzo
+distinto in `to`, `cc` e `bcc` conta come un'email) e `limits.domains` sono i tetti
 dell'**account**
 proprietario del workspace, condivisi con i suoi altri workspace, non una
 dotazione di questo solo workspace. `limits.membersPerWorkspace` è il numero di
@@ -243,7 +240,7 @@ nuovo**: non c'è nessun job schedulato di reset. Un account che a ottobre non
 invia nulla riparte comunque da zero a novembre, al primo invio di novembre.
 
 <Callout type="warn">
-**Non esiste un piano "Pro", né un piano senza tetto mensile di destinatari.** I
+**Non esiste un piano "Pro", né un piano senza tetto mensile di email.** I
 piani sono quelli della tabella qui sopra, e `GET /v1/workspace` riporta sempre
 uno di questi.
 </Callout>

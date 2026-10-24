@@ -227,21 +227,21 @@ viene scritto né addebitato niente:
 Dividi l'invio in più email, oppure usa una [campagna](/it/docs/campaigns)
 per un pubblico più ampio.
 
-**Ogni destinatario distinto consuma un'unità della
+**Ogni destinatario distinto conta come un'email della
 [quota mensile](/it/docs/rate-limits#limiti-di-piano).** Un'email con `to`
-`a@example.com`, `cc` `A@example.com` e `bcc` `b@example.com` consuma due
-unità. Il controllo è tutto o niente: se all'account restano meno destinatari
-di quanti ne ha l'email, l'API risponde `429 QUOTA_EXCEEDED` e non parte
+`a@example.com`, `cc` `A@example.com` e `bcc` `b@example.com` conta come due
+email. Il controllo è tutto o niente: se all'account restano meno email
+di quanti destinatari distinti ha l'email, l'API risponde `429 QUOTA_EXCEEDED` e non parte
 niente, nemmeno verso i primi destinatari.
 
 Il messaggio dipende da chi fa la richiesta. Il proprietario del workspace,
-nella dashboard, vede quanti destinatari restano:
+nella dashboard, vede quante email restano:
 
 ```json
 {
   "error": {
     "code": "QUOTA_EXCEEDED",
-    "message": "This email has 3 recipients, but only 2 of the 3000 monthly recipients of the free plan remain. Every distinct address in to, cc and bcc counts. The quota is shared by every workspace of the account that owns this one.",
+    "message": "This email has 3 recipients, but only 2 of the 3000 monthly emails of the free plan remain. Each distinct address in to, cc and bcc counts as one email. The quota is shared by every workspace of the account that owns this one.",
     "docs": "https://docs.tratto.email/en/docs/error-codes",
     "suggestion": "Send to fewer recipients, or have the workspace owner upgrade the plan at https://app.tratto.email/settings/billing."
   }
@@ -254,7 +254,7 @@ Una chiave API o un membro ricevono lo stesso errore senza il residuo:
 {
   "error": {
     "code": "QUOTA_EXCEEDED",
-    "message": "This email has 3 recipients, more than the recipients left on the free plan (3000 per month). Every distinct address in to, cc and bcc counts. The quota is shared by every workspace of the account that owns this one.",
+    "message": "This email has 3 recipients, more than the emails left on the free plan (3000 per month). Each distinct address in to, cc and bcc counts as one email. The quota is shared by every workspace of the account that owns this one.",
     "docs": "https://docs.tratto.email/en/docs/error-codes",
     "suggestion": "Send to fewer recipients, or have the workspace owner upgrade the plan at https://app.tratto.email/settings/billing."
   }
@@ -289,16 +289,16 @@ L'email verrà messa in coda e inviata all'orario specificato (deve essere nel f
 
 Un'email live programmata consuma la [quota mensile](/it/docs/rate-limits#limiti-di-piano)
 del **mese UTC del suo `scheduledAt`**, non del mese in cui fai la richiesta:
-un'unità per destinatario distinto (richiede l'API 0.21.0 o successiva). Le
-unità vengono prenotate quando l'API accetta il `POST`. Se in quel mese
-restano meno destinatari di quanti ne ha l'email, la richiesta fallisce con `429 QUOTA_EXCEEDED` e il messaggio nomina il
+un'email per destinatario distinto (richiede l'API 0.21.0 o successiva).
+Vengono prenotate quando l'API accetta il `POST`. Se in quel mese
+restano meno email di quanti destinatari distinti ha l'email, la richiesta fallisce con `429 QUOTA_EXCEEDED` e il messaggio nomina il
 mese:
 
 ```json
 {
   "error": {
     "code": "QUOTA_EXCEEDED",
-    "message": "This email has 3 recipients, more than the recipients left for 2026-11 on the free plan (3000 per month). Every distinct address in to, cc and bcc counts. A scheduled email counts against the UTC month of its scheduledAt. The quota is shared by every workspace of the account that owns this one.",
+    "message": "This email has 3 recipients, more than the emails left for 2026-11 on the free plan (3000 per month). Each distinct address in to, cc and bcc counts as one email. A scheduled email counts against the UTC month of its scheduledAt. The quota is shared by every workspace of the account that owns this one.",
     "docs": "https://docs.tratto.email/en/docs/error-codes",
     "suggestion": "Cancel or reschedule other emails for 2026-11, send to fewer recipients, or have the workspace owner upgrade the plan at https://app.tratto.email/settings/billing."
   }
@@ -314,8 +314,8 @@ programmate restano valide dopo un downgrade di piano.
 
 ### Annullare un'email programmata
 
-`DELETE /v1/emails/{id}` annulla un'email ancora `scheduled` e restituisce le
-sue unità, una per destinatario distinto, al mese su cui erano prenotate. Risponde `204` senza corpo. Un'email
+`DELETE /v1/emails/{id}` annulla un'email ancora `scheduled` e restituisce la
+sua quota, un'email per destinatario distinto, al mese su cui era prenotata. Risponde `204` senza corpo. Un'email
 già `queued` o `sent` non si può annullare: l'API risponde `409 CONFLICT`.
 
 ```bash
@@ -327,8 +327,8 @@ curl -X DELETE https://api.tratto.email/v1/emails/email_abc123xyz \
 
 `PATCH /v1/emails/{id}` con un nuovo `scheduledAt`, che deve essere nel
 futuro, sposta un'email ancora `scheduled`. Nello stesso mese UTC la quota non
-cambia. In un altro mese le unità si spostano con l'email: se nel mese di
-destinazione restano meno destinatari di quanti ne ha l'email, l'API risponde `429 QUOTA_EXCEEDED` e l'email resta
+cambia. In un altro mese la quota si sposta con l'email: se nel mese di
+destinazione restano meno email di quanti destinatari distinti ha l'email, l'API risponde `429 QUOTA_EXCEEDED` e l'email resta
 com'era. Il body accetta solo `scheduledAt`: con l'API 0.24.0 o successiva
 qualunque altro campo fallisce con `422 VALIDATION_ERROR` e l'email non cambia
 (vedi [Campi sconosciuti](#campi-sconosciuti)).
@@ -464,8 +464,8 @@ dominio indicato in `message`.
 
 ### QUOTA_EXCEEDED
 
-**Causa:** All'account restano, questo mese, meno destinatari di quanti ne ha
-l'email, oppure, con `scheduledAt`, nel mese per cui è programmata. Non è
+**Causa:** All'account restano, questo mese, meno email di quanti destinatari distinti
+ha l'email, oppure, con `scheduledAt`, nel mese per cui è programmata. Non è
 partito niente.
 
 **Fix:** Invia a meno destinatari, aspetta il mese UTC successivo o passa a un

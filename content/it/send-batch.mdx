@@ -155,14 +155,14 @@ richiesta è ancora in corso risponde `409 IDEMPOTENCY_IN_PROGRESS`. Vedi
 
 ## Quota
 
-Ogni email consuma un'unità della [quota mensile](/it/docs/rate-limits#limiti-di-piano)
-per ogni destinatario distinto fra `to`, `cc` e `bcc`, ignorando le maiuscole,
+Ogni email conta sulla [quota mensile](/it/docs/rate-limits#limiti-di-piano)
+come un'email per ogni destinatario distinto fra `to`, `cc` e `bcc`, ignorando le maiuscole,
 esattamente come un invio singolo. I destinatari si deduplicano dentro la
 stessa email, mai fra email diverse: lo stesso indirizzo in due email del
-batch consuma due unità.
+batch conta come due email.
 
 Il batch riserva la somma di tutte le sue email in una volta, **tutto o
-niente**. Se all'account restano meno destinatari di quanti ne ha il batch in
+niente**. Se all'account restano meno email di quanti destinatari distinti ha il batch in
 totale, l'API risponde `429 QUOTA_EXCEEDED` e non si scrive né si invia
 niente:
 
@@ -170,14 +170,14 @@ niente:
 {
   "error": {
     "code": "QUOTA_EXCEEDED",
-    "message": "This batch has 120 recipients, more than the recipients left on the free plan (3000 per month). Every distinct address in to, cc and bcc counts. The quota is shared by every workspace of the account that owns this one.",
+    "message": "This batch has 120 recipients, more than the emails left on the free plan (3000 per month). Each distinct address in to, cc and bcc counts as one email. The quota is shared by every workspace of the account that owns this one.",
     "docs": "https://docs.tratto.email/en/docs/error-codes",
     "suggestion": "Send to fewer recipients, or have the workspace owner upgrade the plan at https://app.tratto.email/settings/billing."
   }
 }
 ```
 
-In test mode il tetto giornaliero di 100 destinatari di test conta la somma
+In test mode il tetto giornaliero di 100 email di test conta la somma
 del batch allo stesso modo.
 
 ## Rate limit
@@ -195,7 +195,7 @@ il messaggio `Rate limit exceeded: 10 batch requests/second per API key.` Vedi
 | 422 | `VALIDATION_ERROR` | 0 o più di 100 email; un'email non valida; più di 50 destinatari in un'email; `scheduledAt`, `attachments` o un campo sconosciuto; un header riservato; nessun mittente; un'email oltre 900 KB o un batch oltre 9 MiB dopo il render | Niente |
 | 403 | `FORBIDDEN` | Il dominio mittente di un'email non è verificato (`emails[i]: …`). Controllato solo con una chiave live | Niente |
 | 413 | `PAYLOAD_TOO_LARGE` | Body della richiesta oltre 5 MiB | Niente |
-| 429 | `QUOTA_EXCEEDED` | Restano meno destinatari di quanti ne ha il batch in totale | Niente |
+| 429 | `QUOTA_EXCEEDED` | Restano meno email di quanti destinatari ha il batch in totale | Niente |
 | 429 | `RATE_LIMITED` | Più di 10 batch al secondo per chiave, o un altro rate limit. Riprova dopo `Retry-After` se presente, altrimenti dopo un breve backoff | Niente |
 | 409 | `IDEMPOTENCY_CONFLICT` | Stessa `Idempotency-Key`, body diverso | Niente |
 | 409 | `IDEMPOTENCY_IN_PROGRESS` | Stessa `Idempotency-Key` mentre la prima richiesta è ancora in corso | Niente |
