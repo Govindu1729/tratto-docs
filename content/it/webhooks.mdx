@@ -108,6 +108,15 @@ registrazione.
 ce ne sono. Usa `id` per deduplicare: i retry consegnano lo stesso evento più di
 una volta.
 
+`recipient` è l'indirizzo a cui si riferisce l'evento. Per `bounced` e
+`complained` è l'indirizzo segnalato dal server di posta del destinatario, e la
+differenza si vede quando la stessa email parte verso più indirizzi (`to`, `cc`,
+`bcc`): in quel caso puoi ricevere più eventi `bounced` o `complained`, uno per
+ogni indirizzo coinvolto, ciascuno con il suo `id`. Una sola segnalazione di
+spam può riguardare più destinatari dello stesso dominio: ricevi un evento
+`complained` per ognuno e ogni contatto corrispondente viene messo in
+soppressione. `delivered` resta sempre un solo evento per email.
+
 ## Verifica Firma Webhook
 
 Ogni consegna porta un header `X-Tratto-Signature`. **Non** è un hash nudo:
@@ -159,7 +168,9 @@ Due conseguenze da tenere presenti:
 
 - **Conferma prima di elaborare.** Tutto ciò che supera i 10 secondi conta come
   fallimento e verrà ritentato.
-- **Gestisci i duplicati.** Deduplica sul campo `id` dell'evento.
+- **Gestisci i duplicati.** Deduplica sul campo `id` dell'evento. Due eventi
+  `bounced` con lo stesso `emailId` ma `id` diversi non sono duplicati:
+  riguardano destinatari diversi.
 
 Un webhook disattivato per fallimenti ripetuti ha `status: "disabled"`. Ruotarne
 il segreto azzera il contatore dei fallimenti e lo riattiva; sul piano Free la
