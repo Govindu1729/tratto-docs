@@ -1,7 +1,7 @@
 ---
 title: Aumentare il Volume di Invio
 description: Come funziona la reputazione sul pool di invio condiviso di Tratto, e come far crescere i volumi senza danneggiarla
-updatedAt: 2026-09-10
+updatedAt: 2026-10-24
 ---
 
 L'**IP warming** è la pratica di aumentare gradualmente il volume di email su
@@ -9,11 +9,12 @@ un IP nuovo, così che i server di posta possano costruirne la reputazione
 invece di trattare un'ondata improvvisa come un attacco.
 
 <Callout type="warn">
-**Su Tratto non riscaldi nessun IP: non hai un IP tuo.** Tutti gli invii
-passano da un pool condiviso gestito da Tratto. Gli IP dedicati non sono
-disponibili, e non esiste alcuna automazione di warming per workspace: nulla
-sorveglia il tuo volume né lo dosa al posto tuo. Quello che segue è ciò che
-devi fare **tu**, e non è facoltativo.
+**Sulla maggior parte dei piani non riscaldi nessun IP: non hai un IP tuo.**
+Gli invii passano da un pool condiviso gestito da Tratto, e per il pool non
+esiste alcuna automazione di warming per workspace: nulla sorveglia il tuo
+volume né lo dosa al posto tuo. Un IP dedicato è disponibile solo nel piano
+**Scale**, vedi [Se hai un IP dedicato](#se-hai-un-ip-dedicato). Quello che
+segue è ciò che devi fare **tu** sul pool condiviso, e non è facoltativo.
 </Callout>
 
 ## Cosa significa per te
@@ -31,6 +32,18 @@ attraverso. Vale in entrambe le direzioni:
 
 La salita graduale resta quindi compito tuo. Riguarda però la reputazione del
 *tuo dominio* e il *tuo* effetto sul pool, non un IP di tua proprietà.
+
+## Se hai un IP dedicato
+
+Un IP dedicato è incluso solo nel piano **Scale**, uno per workspace. Viene
+attivato su richiesta quando il workspace invia almeno 3.000 email al giorno
+(ogni destinatario conta uno, come la quota mensile). Sugli altri piani non è
+disponibile.
+
+Un IP dedicato nuovo si riscalda automaticamente in circa 45 giorni. Durante il
+riscaldamento parte delle tue email continua a uscire da IP condivisi, e nulla
+viene ritardato o rifiutato a causa del riscaldamento. Finito il
+riscaldamento, la reputazione dell'IP dipende solo dai tuoi invii.
 
 ## Far Crescere i Volumi
 

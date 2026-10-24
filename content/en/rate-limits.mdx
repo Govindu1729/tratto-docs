@@ -1,6 +1,7 @@
 ---
 title: Rate Limits & Quotas
 description: Understand API rate limits and plan your integration
+updatedAt: 2026-10-24
 ---
 
 ## Two Rate Limits
@@ -125,7 +126,8 @@ Each plan has two caps:
 |---|---|---|
 | Free | 3,000 | 3 |
 | Starter | 75,000 | 10 |
-| Growth | 500,000 | 100 |
+| Growth | 300,000 | 100 |
+| Scale | 1,500,000 | 250 |
 
 The monthly quota counts **recipients**, not emails (requires API 0.21.0 or
 later): every distinct address in `to`, `cc` and `bcc` of an email uses one
@@ -140,11 +142,16 @@ generations per month** on every plan, reset at 00:00 UTC on the 1st.
 
 Test sends of templates and campaigns are free and have a daily cap of their
 own, counted **per workspace** and reset at midnight UTC (requires API 0.24.0
-or later): **20 a day** on Free, **100 a day** on Starter and Growth. See
+or later): **20 a day** on Free, **100 a day** on Starter and Growth, **200 a day** on Scale. See
 [Test sends](/en/docs/templates#free-with-a-daily-cap).
 
-Webhooks are included from **Starter** onward (Starter and Growth), not on
-Free: see [Plan availability](/en/docs/webhooks#plan-availability).
+Webhooks are included from **Starter** onward (Starter, Growth and Scale), not
+on Free: see [Plan availability](/en/docs/webhooks#plan-availability).
+
+A dedicated IP is included on **Scale** only, one per workspace, enabled on
+request once the workspace sends at least 3,000 emails a day (each recipient
+counts as one, like the monthly quota). It is not available on other plans:
+see [If you have a dedicated IP](/en/docs/ip-warming#if-you-have-a-dedicated-ip).
 
 ### The caps belong to the account, not the workspace
 

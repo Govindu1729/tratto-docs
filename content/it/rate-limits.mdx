@@ -1,6 +1,7 @@
 ---
 title: Rate Limit e Quote
 description: Comprendi i rate limit dell'API e pianifica la tua integrazione
+updatedAt: 2026-10-24
 ---
 
 ## Due Rate Limit
@@ -126,7 +127,8 @@ Ogni piano ha due tetti:
 |---|---|---|
 | Free | 3.000 | 3 |
 | Starter | 75.000 | 10 |
-| Growth | 500.000 | 100 |
+| Growth | 300.000 | 100 |
+| Scale | 1.500.000 | 250 |
 
 La quota mensile conta i **destinatari**, non le email (richiede l'API 0.21.0
 o successiva): ogni indirizzo distinto in `to`, `cc` e `bcc` di un'email
@@ -144,10 +146,15 @@ giorno del mese.
 I test-send di template e campagne sono gratuiti e hanno un tetto giornaliero
 a sé, contato **per workspace** e azzerato a mezzanotte UTC (richiede l'API
 0.24.0 o successiva): **20 al giorno** su Free, **100 al giorno** su Starter e
-Growth. Vedi [Test-send](/it/docs/templates#gratis-con-un-tetto-giornaliero).
+Growth, **200 al giorno** su Scale. Vedi [Test-send](/it/docs/templates#gratis-con-un-tetto-giornaliero).
 
-I webhook sono inclusi da **Starter** in su (Starter e Growth), non nel
+I webhook sono inclusi da **Starter** in su (Starter, Growth e Scale), non nel
 Free: vedi [Piani che includono i webhook](/it/docs/webhooks#piani-che-includono-i-webhook).
+
+Un IP dedicato è incluso solo nel piano **Scale**, uno per workspace,
+attivato su richiesta quando il workspace invia almeno 3.000 email al giorno
+(ogni destinatario conta uno, come la quota mensile). Sugli altri piani non è
+disponibile: vedi [Se hai un IP dedicato](/it/docs/ip-warming#se-hai-un-ip-dedicato).
 
 ### I tetti sono dell'account, non del workspace
 
