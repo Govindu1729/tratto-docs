@@ -1,6 +1,7 @@
 ---
 title: Rate Limits & Quotas
 description: Understand API rate limits and plan your integration
+updatedAt: 2026-10-24
 ---
 
 ## Two Rate Limits
@@ -35,8 +36,7 @@ A [batch send](/en/docs/send-batch) counts as one request on the 100/second
 limit, whatever the number of emails in it, and also against its own limit of
 10 batch calls per second per key. Over it the 429 carries `Retry-After: 1`
 and the message `Rate limit exceeded: 10 batch requests/second per API key.`
-On the monthly quota every email of the batch counts, one unit per distinct
-recipient.
+On the monthly email quota every email of the batch counts, one email per distinct recipient.
 
 ## Rate Limit Headers
 
@@ -121,18 +121,18 @@ async function sendWithRetry(url, options, maxRetries = 3) {
 
 Each plan has two caps:
 
-| Plan | Recipients per month | Domains |
+| Plan | Emails per month | Domains |
 |---|---|---|
 | Free | 3,000 | 3 |
 | Starter | 75,000 | 10 |
-| Growth | 500,000 | 100 |
+| Growth | 300,000 | 100 |
+| Scale | 1,500,000 | 250 |
 
-The monthly quota counts **recipients**, not emails (requires API 0.21.0 or
-later): every distinct address in `to`, `cc` and `bcc` of an email uses one
-unit, ignoring case, and an address repeated in the same email counts once.
-An email to one person uses one unit, an email to three distinct people uses
-three. A campaign or a flow sends one email per recipient, so for them one
-recipient is still one email. An email can have at most 50 distinct
+The monthly quota is in **emails**, and each distinct recipient counts as one email (requires API 0.21.0 or
+later): every distinct address in `to`, `cc` and `bcc` of an email counts as one, ignoring case, and an
+address repeated in the same email counts once. An email to one person counts as one email, an email to
+three distinct people counts as three. A campaign or a flow sends one email per recipient, so for them the
+count is the number of emails sent. An email can have at most 50 distinct
 recipients: see [Recipients](/en/docs/send-email#recipients-to-cc-and-bcc).
 
 AI template generation in the dashboard has an allowance of its own, **50
@@ -140,11 +140,16 @@ generations per month** on every plan, reset at 00:00 UTC on the 1st.
 
 Test sends of templates and campaigns are free and have a daily cap of their
 own, counted **per workspace** and reset at midnight UTC (requires API 0.24.0
-or later): **20 a day** on Free, **100 a day** on Starter and Growth. See
+or later): **20 a day** on Free, **100 a day** on Starter and Growth, **200 a day** on Scale. See
 [Test sends](/en/docs/templates#free-with-a-daily-cap).
 
-Webhooks are included from **Starter** onward (Starter and Growth), not on
-Free: see [Plan availability](/en/docs/webhooks#plan-availability).
+Webhooks are included from **Starter** onward (Starter, Growth and Scale), not
+on Free: see [Plan availability](/en/docs/webhooks#plan-availability).
+
+A dedicated IP is included on **Scale** only, one per workspace, enabled on
+request once the workspace sends at least 3,000 emails a day (each recipient
+counts as one, like the monthly quota). It is not available on other plans:
+see [If you have a dedicated IP](/en/docs/ip-warming#if-you-have-a-dedicated-ip).
 
 ### The caps belong to the account, not the workspace
 
@@ -156,20 +161,20 @@ allowance. A `QUOTA_EXCEEDED` can therefore come from usage you did not make
 yourself, in another workspace of the same account or by another member.
 
 There is **no per-day cap** on a plan. The only daily limit in the product is
-the test-mode one, 100 test recipients per day, see
+the test-mode one, 100 test emails per day (each recipient counts as one), see
 [Test Mode](/en/docs/test-mode).
 
-When an email has more recipients than the account has left, the request
+When an email has more distinct recipients than the account has emails left, the request
 fails with `QUOTA_EXCEEDED`, which also returns 429, and nothing is sent: the
 check is all or nothing. Unlike `RATE_LIMITED` it will not clear by retrying: see
 [Error Codes](/en/docs/error-codes).
 
 A scheduled email counts in the UTC month it is scheduled for, not the month
 you created it. A month's counter, the one compared with the limit and shown
-in the dashboard as **Recipients used this month**, includes the recipients of the
-live emails scheduled for that month, whether they have already gone out or
-are still waiting. Canceling a scheduled email gives its units back, and
-rescheduling it into another month moves the units: see
+in the dashboard as **Emails used this month**, includes the live emails scheduled for that month,
+one per distinct recipient, whether they have already gone out or
+are still waiting. Canceling a scheduled email gives its quota back, and
+rescheduling it into another month moves the quota: see
 [Quota of scheduled emails](/en/docs/send-email#quota-of-scheduled-emails).
 
 The domain limit counts every domain in every workspace of the account,
@@ -194,8 +199,8 @@ the cap the API answers `429 QUOTA_EXCEEDED`:
 
 Do not hard-code the numbers above. `GET /v1/workspace` returns the limits
 that are actually enforced, and `null` means no limit. `limits.emailsPerMonth`
-(recipients per UTC month, every distinct address in `to`, `cc` and `bcc`
-counting as one) and `limits.domains` are the caps of the **account** that owns the workspace,
+(emails per UTC month, every distinct address in `to`, `cc` and `bcc`
+counting as one email) and `limits.domains` are the caps of the **account** that owns the workspace,
 shared with its other workspaces, not an allowance of this workspace alone.
 `limits.membersPerWorkspace` is the number of people each workspace can have,
 counting pending invites (see [Team](/en/docs/team#how-many-people-each-plan-allows)).
@@ -230,7 +235,7 @@ month**. There is no scheduled reset job: an account that sends nothing in
 October still starts November at zero, on its first November send.
 
 <Callout type="warn">
-**There is no "Pro" plan, and no plan without a monthly recipient cap.** The plans
+**There is no "Pro" plan, and no plan without a monthly email cap.** The plans
 are the ones in the table above, and `GET /v1/workspace` always reports one of
 them.
 </Callout>

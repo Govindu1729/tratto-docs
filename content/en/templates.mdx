@@ -1,6 +1,7 @@
 ---
 title: "Templates: Create, Version & Test"
 description: Manage versioned email templates with variable substitution
+updatedAt: 2026-10-24
 ---
 
 **Templates** are reusable email templates with placeholder variables. Instead of composing HTML in code every time, define a template once and send it hundreds of times with different variables.
@@ -310,7 +311,7 @@ variable you leave out renders empty, as on a real send.
 Test sends are free: they do not count against the
 [monthly quota](/en/docs/rate-limits). Each call sends to one recipient. With
 API 0.24.0 or later, a workspace can make 20 test sends per day on
-Free and 100 on Starter and Growth, template and campaign test sends together, and the count resets at midnight
+Free, 100 on Starter and Growth and 200 on Scale, template and campaign test sends together, and the count resets at midnight
 UTC. Past the cap the API answers `429 QUOTA_EXCEEDED` and nothing is sent: do
 not retry before the reset. A call refused with `404` or `422` does not use
 the cap; an accepted call does, even if it then answers `503`, because the cap

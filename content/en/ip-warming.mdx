@@ -1,7 +1,7 @@
 ---
 title: Ramping Up Sending Volume
 description: How reputation works on Tratto's shared sending pool, and how to ramp new volume without damaging it
-updatedAt: 2026-09-10
+updatedAt: 2026-10-24
 ---
 
 **IP warming** is the practice of increasing email volume on a new IP
@@ -9,11 +9,12 @@ gradually, so mail servers can build a reputation for it instead of treating a
 sudden flood as an attack.
 
 <Callout type="warn">
-**On Tratto you do not warm an IP — you have no IP of your own.** All sending
-goes over a shared pool that Tratto operates. Dedicated IPs are not available,
-and there is no per-workspace warming automation: nothing watches your volume
-or paces it for you. What follows is what *you* have to do, and it is not
-optional.
+**On most plans you do not warm an IP, because you have no IP of your own.**
+Sending goes over a shared pool that Tratto operates, and there is no
+per-workspace warming automation for it: nothing watches your volume or paces
+it for you. A dedicated IP is available on the **Scale** plan only, see
+[If you have a dedicated IP](#if-you-have-a-dedicated-ip). What follows is
+what *you* have to do on the shared pool, and it is not optional.
 </Callout>
 
 ## What this means for you
@@ -31,6 +32,18 @@ cuts both ways:
 
 So the ramp is still your job. It is just about *your domain's* reputation and
 *your* effect on the pool, not about an IP you own.
+
+## If you have a dedicated IP
+
+A dedicated IP is included on the **Scale** plan only, one per workspace. It is
+enabled on request once the workspace sends at least 3,000 emails a day (each
+recipient counts as one, like the monthly quota). It is not available on other
+plans.
+
+A new dedicated IP warms up automatically over about 45 days. During warm-up
+part of your mail keeps going out over shared IPs, and nothing is delayed or
+rejected because of warm-up. After warm-up, the IP's reputation depends only on
+your own sending.
 
 ## Ramping New Volume
 

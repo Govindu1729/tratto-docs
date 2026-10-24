@@ -1,6 +1,7 @@
 ---
 title: "Template: Crea, Versiona e Test"
 description: Gestisci template email versionati con sostituzione di variabili
+updatedAt: 2026-10-24
 ---
 
 I **template** sono template email riutilizzabili con variabili placeholder. Invece di comporre HTML nel codice ogni volta, definisci un template una volta e invialo centinaia di volte con variabili diverse.
@@ -316,7 +317,7 @@ invio reale.
 I test-send sono gratuiti: non contano sulla
 [quota mensile](/it/docs/rate-limits). Ogni chiamata invia a un solo
 destinatario. Con l'API 0.24.0 o successiva, un workspace può fare 20
-test-send al giorno su Free e 100 su Starter e Growth, fra template e campagne insieme, e il conteggio si azzera
+test-send al giorno su Free, 100 su Starter e Growth e 200 su Scale, fra template e campagne insieme, e il conteggio si azzera
 a mezzanotte UTC. Oltre il tetto l'API risponde `429 QUOTA_EXCEEDED` e non
 parte niente: non riprovare prima dell'azzeramento. Una chiamata rifiutata con
 `404` o `422` non consuma il tetto; una chiamata accettata sì, anche se poi

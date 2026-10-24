@@ -153,27 +153,27 @@ running answers `409 IDEMPOTENCY_IN_PROGRESS`. See
 
 ## Quota
 
-Each email uses one unit of the [monthly quota](/en/docs/rate-limits#plan-limits)
-per distinct recipient in its `to`, `cc` and `bcc`, ignoring case, exactly as
+Each email counts against the [monthly quota](/en/docs/rate-limits#plan-limits)
+as one email per distinct recipient in its `to`, `cc` and `bcc`, ignoring case, exactly as
 on a single send. Recipients are deduplicated within one email, never across
-emails: the same address in two emails of the batch uses two units.
+emails: the same address in two emails of the batch counts as two emails.
 
 The batch reserves the sum of its emails at once, **all or nothing**. If the
-account has fewer recipients left than the batch has in total, the API answers
+account has fewer emails left than the batch has distinct recipients in total, the API answers
 `429 QUOTA_EXCEEDED` and nothing is written or sent:
 
 ```json
 {
   "error": {
     "code": "QUOTA_EXCEEDED",
-    "message": "This batch has 120 recipients, more than the recipients left on the free plan (3000 per month). Every distinct address in to, cc and bcc counts. The quota is shared by every workspace of the account that owns this one.",
+    "message": "This batch has 120 recipients, more than the emails left on the free plan (3000 per month). Each distinct address in to, cc and bcc counts as one email. The quota is shared by every workspace of the account that owns this one.",
     "docs": "https://docs.tratto.email/en/docs/error-codes",
     "suggestion": "Send to fewer recipients, or have the workspace owner upgrade the plan at https://app.tratto.email/settings/billing."
   }
 }
 ```
 
-In [test mode](/en/docs/test-mode) the daily cap of 100 test recipients counts
+In [test mode](/en/docs/test-mode) the daily cap of 100 test emails counts
 the sum of the batch in the same way.
 
 ## Rate limits
@@ -191,7 +191,7 @@ the message `Rate limit exceeded: 10 batch requests/second per API key.` See
 | 422 | `VALIDATION_ERROR` | 0 or more than 100 emails; an invalid email; more than 50 recipients in one email; `scheduledAt`, `attachments` or an unknown field; a reserved header; no sender; an email over 900 KB or a batch over 9 MiB once rendered | Nothing |
 | 403 | `FORBIDDEN` | The sender domain of an email is not verified (`emails[i]: …`). Checked only with a live key | Nothing |
 | 413 | `PAYLOAD_TOO_LARGE` | Request body over 5 MiB | Nothing |
-| 429 | `QUOTA_EXCEEDED` | Fewer recipients left than the batch has in total | Nothing |
+| 429 | `QUOTA_EXCEEDED` | Fewer emails left than the batch has recipients in total | Nothing |
 | 429 | `RATE_LIMITED` | More than 10 batches per second per key, or another rate limit. Retry after `Retry-After` when present, otherwise after a short backoff | Nothing |
 | 409 | `IDEMPOTENCY_CONFLICT` | Same `Idempotency-Key`, different body | Nothing |
 | 409 | `IDEMPOTENCY_IN_PROGRESS` | Same `Idempotency-Key` while the first request is still running | Nothing |

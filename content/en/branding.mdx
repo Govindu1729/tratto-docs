@@ -1,6 +1,7 @@
 ---
 title: Email Footer & Branding
 description: When Tratto appends a footer to your emails — the "Sent using Tratto" badge, mandatory on some plans (today Free) and opt-in on the others.
+updatedAt: 2026-10-24
 ---
 
 Tratto can append a small footer to the HTML version of the emails you send. There are two variants:
@@ -19,7 +20,7 @@ Some plans require the branded footer — today that is only **Free**. On those 
 
 ## Other plans
 
-On every other plan — today Starter and Growth — the badge is off by default:
+On every other plan (today Starter, Growth and Scale) the badge is off by default:
 
 - **Campaigns**: a plain unsubscribe footer (marketing email must always offer an opt-out).
 - **Transactional emails and test sends**: no footer at all — your HTML is delivered as-is.
@@ -58,7 +59,7 @@ Good to know:
 | Plan | `keepTrattoBranding` | Campaign | Transactional linked to a contact | Transactional / test send, no contact |
 |------|----------------------|----------|-----------------------------------|---------------------------------------|
 | Footer required (today Free) | any value (ignored) | Branded + unsubscribe | Branded + unsubscribe | Branded, no unsubscribe link |
-| Other plans (today Starter, Growth) | `true` | Branded + unsubscribe | Branded + unsubscribe | Branded, no unsubscribe link |
+| Other plans (today Starter, Growth, Scale) | `true` | Branded + unsubscribe | Branded + unsubscribe | Branded, no unsubscribe link |
 | Other plans | `false` / not set (default) | Plain unsubscribe | No footer | No footer |
 
 Independently of the footer, every email sent through Tratto carries RFC 8058 one-click unsubscribe headers — see [Privacy & Compliance](/en/docs/privacy).
