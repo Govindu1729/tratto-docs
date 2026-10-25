@@ -57,7 +57,7 @@ curl -X POST https://api.tratto.email/v1/webhooks \
   -H "Content-Type: application/json" \
   -d '{
     "url":"https://yourapi.com/webhooks/tratto",
-    "events":["sent","delivered","opened","clicked","bounced","complained","unsubscribed"]
+    "events":["sent","delivered","opened","clicked","bounced","complained","unsubscribed","failed"]
   }'
 ```
 
@@ -66,7 +66,7 @@ curl -X POST https://api.tratto.email/v1/webhooks \
 {
   "data": {
     "id": "wh_abc123",
-    "secret": "whsec_5f3a9c1e8b2d..."
+    "secret": "whsec_..."
   }
 }
 ```
@@ -88,9 +88,11 @@ Tratto invia richieste `POST` al tuo URL quando si verificano questi eventi:
 | `bounced` | Il server di posta ha rifiutato la consegna |
 | `complained` | Il destinatario ha segnalato il messaggio come spam |
 | `unsubscribed` | Il destinatario ha cliccato per disiscriversi |
+| `failed` | L'email non è stata inviata. Vedi [Evento failed](#evento-failed) (richiede l'API 0.29.0 o successiva) |
 
 Sottoscrivere un evento fuori da questa lista viene rifiutato in fase di
-registrazione.
+registrazione. Un webhook riceve solo gli eventi elencati nel suo `events`:
+non esiste un carattere jolly.
 
 ## Payload del Webhook
 
@@ -117,6 +119,60 @@ ogni indirizzo coinvolto, ciascuno con il suo `id`. Una sola segnalazione di
 spam può riguardare più destinatari dello stesso dominio: ricevi un evento
 `complained` per ognuno e ogni contatto corrispondente viene messo in
 soppressione. `delivered` resta sempre un solo evento per email.
+
+## Evento failed
+
+Richiede l'API 0.29.0 o successiva.
+
+`failed` dice che un'email **non è stata inviata**: Tratto l'ha fermata prima
+o durante il passaggio al provider di posta. È l'evento dietro lo
+[status](/it/docs/email-status#definizioni-dello-status) `failed`. C'è un solo
+evento `failed` per email, e il suo `recipient` è il primo indirizzo in `to`.
+
+```json
+{
+  "id": "evt_abc123",
+  "type": "failed",
+  "emailId": "email_xyz789",
+  "recipient": "user@example.com",
+  "occurredAt": "2026-11-02T09:00:01Z",
+  "data": {
+    "reason": "template_not_published",
+    "error": "Template 'tmpl_abc123' is not published and cannot be used to send."
+  },
+  "livemode": true
+}
+```
+
+- `data.reason` è un codice stabile, lo stesso che `GET /v1/emails/{id}`
+  restituisce come `failureReason`. È il campo su cui decidere.
+- `data.error` è una frase per le persone. Può contenere testo del provider di
+  posta: non analizzarla e non mostrarla così com'è ai tuoi utenti.
+
+| `reason` | Perché l'email non è partita | Definitivo |
+|---|---|---|
+| `interrupted` | La consegna si è interrotta mentre l'email passava al provider di posta, quindi Tratto non può sapere se il provider l'ha accettata. Non viene ritentata, per non inviarla due volte. Vedi [Quando la consegna viene interrotta](/it/docs/email-status#quando-la-consegna-viene-interrotta) | No |
+| `tenant_not_active` | Il workspace è sospeso o eliminato: l'invio è bloccato | Sì |
+| `sender_domain_unverified` | Il dominio mittente non è verificato al momento dell'invio | Sì |
+| `template_not_found` | Il `templateId` dell'email non esiste | Sì |
+| `template_not_published` | Il template è una bozza. Vedi [Template](/it/docs/templates#pubblica-prima-di-inviare) | Sì |
+| `template_empty` | Il template non ha contenuto | Sì |
+| `provider_rejected` | Il provider di posta ha rifiutato il messaggio. `data.error` riporta la sua spiegazione | Sì |
+| `attachment_unavailable` | Un allegato è stato eliminato o è scaduto prima dell'invio. La quota dell'email viene restituita. Vedi [Allegati](/it/docs/attachments#quando-un-file-manca-allinvio) | Sì |
+
+**L'elenco dei codici è aperto.** Cause nuove aggiungono codici nuovi, e i
+codici esistenti non vengono mai rinominati: tratta un codice che non conosci
+come un fallimento senza un rimedio specifico, mai come un errore del tuo
+handler.
+
+**`interrupted` è l'unico non definitivo.** L'email potrebbe essere arrivata
+comunque: se in seguito il provider la segnala, segue un evento `delivered`,
+`bounced` o `complained` e lo status cambia. Ogni altro `failed` è definitivo.
+
+**I webhook esistenti non lo ricevono.** Un webhook riceve `failed` solo se
+`failed` è nel suo `events`. Non esiste un endpoint che cambi gli eventi di un
+webhook: per iniziare a ricevere `failed`, registra un webhook che lo elenca
+(riceve un secret nuovo) ed elimina quello vecchio.
 
 ## Verifica Firma Webhook
 

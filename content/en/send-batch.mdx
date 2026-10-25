@@ -65,7 +65,11 @@ Rules for each email of the batch:
 - It accepts every field of [`POST /v1/emails`](/en/docs/send-email#full-request-body-reference)
   except `scheduledAt`. To schedule, send the email on its own with
   `POST /v1/emails`.
-- `attachments` is not accepted: it fails with 422.
+- `attachments` is accepted with API 0.29.0 or later, with the same rules as
+  on a single send. Upload a file once and reference the same id from every
+  email that needs it: the batch carries only the ids, so the files do not
+  count toward the size limits below. See
+  [Attachments](/en/docs/attachments#in-a-batch).
 - An unknown field fails with 422: both the body and each email are checked
   strictly. `POST /v1/emails` does the same with API 0.24.0 or later, see
   [Unknown fields](/en/docs/send-email#unknown-fields).
@@ -188,8 +192,10 @@ the message `Rate limit exceeded: 10 batch requests/second per API key.` See
 
 | Status | Code | When | Written or charged |
 |---|---|---|---|
-| 422 | `VALIDATION_ERROR` | 0 or more than 100 emails; an invalid email; more than 50 recipients in one email; `scheduledAt`, `attachments` or an unknown field; a reserved header; no sender; an email over 900 KB or a batch over 9 MiB once rendered | Nothing |
+| 422 | `VALIDATION_ERROR` | 0 or more than 100 emails; an invalid email; more than 50 recipients in one email; `scheduledAt` or an unknown field; an invalid attachment, as on a single send; a reserved header; no sender; an email over 900 KB or a batch over 9 MiB once rendered | Nothing |
 | 403 | `FORBIDDEN` | The sender domain of an email is not verified (`emails[i]: …`). Checked only with a live key | Nothing |
+| 403 | `PLAN_UPGRADE_REQUIRED` | An email carries `attachments` and the workspace is on Free | Nothing |
+| 404 | `NOT_FOUND` | An attachment id that does not exist in this workspace; `details[].path` names the email | Nothing |
 | 413 | `PAYLOAD_TOO_LARGE` | Request body over 5 MiB | Nothing |
 | 429 | `QUOTA_EXCEEDED` | Fewer emails left than the batch has recipients in total | Nothing |
 | 429 | `RATE_LIMITED` | More than 10 batches per second per key, or another rate limit. Retry after `Retry-After` when present, otherwise after a short backoff | Nothing |

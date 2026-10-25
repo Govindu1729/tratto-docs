@@ -40,7 +40,7 @@ status.
 | `delivered` | Il server di posta del destinatario ha confermato la ricezione |
 | `bounced` | Il server di posta del destinatario ha rifiutato l'email |
 | `complained` | Il destinatario ha segnalato l'email come spam |
-| `failed` | Consegna email non riuscita (dominio non valido, mailbox piena, un template non pubblicato, ecc.). Il motivo viene registrato sul documento dell'email, ma oggi nessuno lo espone: `GET /v1/emails/:id` restituisce lo status e non il motivo, e la dashboard legge quello stesso endpoint |
+| `failed` | Tratto non ha inviato l'email (un dominio mittente non verificato, un template non pubblicato, un allegato eliminato, un rifiuto del provider di posta, ecc.). Con l'API 0.29.0 o successiva il motivo è in `failureReason`: vedi [Perché un'email è fallita](#perché-unemail-è-fallita) |
 | `skipped` | Tratto non ha inviato l'email perché il destinatario si è disiscritto o è nella lista di soppressione. Non è partito niente |
 | `canceled` | Hai annullato un'email `scheduled` con `DELETE /v1/emails/:id` prima dell'invio |
 
@@ -61,6 +61,22 @@ status passa a `delivered`, `bounced` o `complained`.
 
 Un'email che resta in `sending` per più di qualche minuto è in questa
 situazione e verrà chiusa come `failed` quando Tratto la riprende in mano.
+
+### Perché un'email è fallita
+
+Richiede l'API 0.29.0 o successiva.
+
+`GET /v1/emails/{id}` e `GET /v1/emails` restituiscono `failureReason` su
+un'email `failed`: un codice stabile come `template_not_published`,
+`provider_rejected` o `attachment_unavailable`. Lo stesso codice arriva come
+`data.reason` nell'[evento webhook](/it/docs/webhooks#evento-failed) `failed`,
+il cui `data.error` aggiunge una frase leggibile. L'elenco dei codici e il loro
+significato è in [Evento failed](/it/docs/webhooks#evento-failed). Possono
+aggiungersi codici nuovi, quindi gestisci anche i valori che non conosci. Le
+email fallite prima che il campo esistesse non hanno `failureReason`.
+
+`interrupted` è l'unico codice non definitivo: vedi
+[Quando la consegna viene interrotta](#quando-la-consegna-viene-interrotta).
 
 ### Transizioni di Stato
 
@@ -156,6 +172,7 @@ Gli **eventi** sono record discreti di tracciamento per quello che è successo a
 | `bounced` | Server di posta ha rifiutato consegna (rimbalzo hard o soft) |
 | `complained` | Destinatario ha segnalato l'email come spam |
 | `unsubscribed` | Destinatario ha cliccato il link di annullamento iscrizione |
+| `failed` | L'email non è stata inviata; `data.reason` e `data.error` dicono perché (richiede l'API 0.29.0 o successiva) |
 
 ### Ottieni Eventi Email
 

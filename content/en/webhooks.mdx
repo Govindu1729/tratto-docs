@@ -58,7 +58,7 @@ curl -X POST https://api.tratto.email/v1/webhooks \
   -H "Content-Type: application/json" \
   -d '{
     "url":"https://yourapi.com/webhooks/tratto",
-    "events":["sent","delivered","opened","clicked","bounced","complained","unsubscribed"]
+    "events":["sent","delivered","opened","clicked","bounced","complained","unsubscribed","failed"]
   }'
 ```
 
@@ -67,7 +67,7 @@ curl -X POST https://api.tratto.email/v1/webhooks \
 {
   "data": {
     "id": "wh_abc123",
-    "secret": "whsec_5f3a9c1e8b2d..."
+    "secret": "whsec_..."
   }
 }
 ```
@@ -89,8 +89,11 @@ Tratto sends `POST` requests to your URL when these events occur:
 | `bounced` | Mail server rejected delivery |
 | `complained` | Recipient marked the message as spam |
 | `unsubscribed` | Recipient clicked unsubscribe |
+| `failed` | The email was not sent. See [The failed event](#the-failed-event) (requires API 0.29.0 or later) |
 
-Subscribing to an event not in this list is rejected at registration.
+Subscribing to an event not in this list is rejected at registration. A
+webhook receives only the events listed in its `events`: there is no
+wildcard.
 
 ## Webhook Payload
 
@@ -119,6 +122,60 @@ to several addresses (`to`, `cc`, `bcc`). That email can produce several
 `id`. A single complaint can name several recipients at the same domain: you get
 one `complained` event for each, and each matching contact is suppressed.
 `delivered` is always one event per email.
+
+## The failed event
+
+Requires API 0.29.0 or later.
+
+`failed` says that an email was **not sent**: Tratto stopped it before or
+while handing it to the mail provider. It is the event behind the `failed`
+[status](/en/docs/email-status#status-definitions). There is one `failed`
+event per email, and its `recipient` is the first address in `to`.
+
+```json
+{
+  "id": "evt_abc123",
+  "type": "failed",
+  "emailId": "email_xyz789",
+  "recipient": "user@example.com",
+  "occurredAt": "2026-11-02T09:00:01Z",
+  "data": {
+    "reason": "template_not_published",
+    "error": "Template 'tmpl_abc123' is not published and cannot be used to send."
+  },
+  "livemode": true
+}
+```
+
+- `data.reason` is a stable code, the same one `GET /v1/emails/{id}` returns
+  as `failureReason`. Branch on it.
+- `data.error` is a sentence for people. It can contain text from the mail
+  provider, so do not parse it and do not show it to your own users as it is.
+
+| `reason` | Why the email was not sent | Final |
+|---|---|---|
+| `interrupted` | Delivery was interrupted while the email was being handed to the mail provider, so Tratto cannot know whether the provider accepted it. It is not retried, to avoid sending it twice. See [When delivery is interrupted](/en/docs/email-status#when-delivery-is-interrupted) | No |
+| `tenant_not_active` | The workspace is suspended or deleted: sending is blocked | Yes |
+| `sender_domain_unverified` | The sender domain is not verified at the moment of sending | Yes |
+| `template_not_found` | The `templateId` of the email does not exist | Yes |
+| `template_not_published` | The template is a draft. See [Templates](/en/docs/templates#publish-before-you-send) | Yes |
+| `template_empty` | The template has no content | Yes |
+| `provider_rejected` | The mail provider refused the message. `data.error` carries its explanation | Yes |
+| `attachment_unavailable` | An attachment was deleted or expired before the send. The quota of the email is given back. See [Attachments](/en/docs/attachments#when-a-file-is-gone-at-send-time) | Yes |
+
+**The list of codes is open.** New causes add new codes, and existing codes
+are never renamed: treat a code you do not know as a failure without a
+specific remedy, never as an error in your handler.
+
+**`interrupted` is the only one that is not final.** The email may still have
+reached the recipient: if the provider later reports it, a `delivered`,
+`bounced` or `complained` event follows and the status changes. Every other
+`failed` is final.
+
+**Existing webhooks do not receive it.** A webhook gets `failed` only if
+`failed` is in its `events`. There is no endpoint that changes the events of a
+webhook: to start receiving `failed`, register a webhook that lists it (it gets
+a new secret) and delete the old one.
 
 ## Verify Webhook Signature
 
