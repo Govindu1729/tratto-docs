@@ -5,7 +5,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 
 import { locales, toLocale } from '@/lib/i18n';
-import { docsPath } from '@/lib/site';
+import { absoluteUrl, docsPath } from '@/lib/site';
 import { TrattoMark } from '@/components/tratto-mark';
 import { SignalTrace } from '@/components/signal-trace';
 
@@ -28,6 +28,16 @@ export async function generateMetadata({
   return {
     title: { absolute: t('metaTitle') },
     description: t('subtitle'),
+    // Each locale home is its own canonical. `/` is a 307 to /en or /it by
+    // Accept-Language, never a page, so it is not a canonical target;
+    // x-default points at /en like every other docs page (tratto-docs#211).
+    alternates: {
+      canonical: `/${locale}`,
+      languages: {
+        ...Object.fromEntries(locales.map((l) => [l, absoluteUrl(`/${l}`)])),
+        'x-default': absoluteUrl('/en'),
+      },
+    },
   };
 }
 
