@@ -13,6 +13,7 @@
     "---Sending Email---",
     "send-email",
     "send-batch",
+    "attachments",
     "templates",
     "emailmd-templates",
     "emailmd-dashboard",

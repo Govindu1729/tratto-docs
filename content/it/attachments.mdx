@@ -1,0 +1,328 @@
+---
+title: Allegati
+description: Carica un file una volta, poi allegalo per id agli invii singoli e ai batch.
+---
+
+Richiede l'API 0.29.0 o successiva.
+
+Inviare un file richiede due passi:
+
+1. **Caricalo** con `POST /v1/attachments`. La risposta ti dà un id, `att_`
+   seguito da 21 caratteri.
+2. **Usa l'id** nel campo `attachments` di
+   [`POST /v1/emails`](/it/docs/send-email) o di qualsiasi email di un
+   [batch](/it/docs/send-batch).
+
+Un file caricato non è legato a una sola email. Finché non scade, lo stesso id
+si può allegare a quante email vuoi: un file che va a molte persone (condizioni
+di servizio, un listino) si carica una volta e ogni email di un batch lo
+richiama, invece di portarsi dietro la propria copia dei byte.
+
+## Piani che includono gli allegati
+
+Gli allegati sono inclusi da **Starter** in su (Starter, Growth e Scale), non
+nel Free. Su un workspace Free sia il caricamento sia un invio con
+`attachments` rispondono `403 PLAN_UPGRADE_REQUIRED`:
+
+```json
+{
+  "error": {
+    "code": "PLAN_UPGRADE_REQUIRED",
+    "message": "This feature is not included in your plan. Upgrade to use it.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes",
+    "suggestion": "Attachments are available from the Starter plan. The account owner can upgrade at https://app.tratto.email/settings/billing."
+  }
+}
+```
+
+## Caricare un file
+
+Il body di `POST /v1/attachments` è **il file stesso**, come byte grezzi: non
+JSON e non `multipart/form-data`. Due header lo descrivono:
+
+- `Content-Type`: il tipo del file, per esempio `application/pdf`.
+- `Content-Disposition`: il nome del file, come
+  `attachment; filename="fattura.pdf"`. Per un nome con caratteri non ASCII usa
+  la forma codificata, `attachment; filename*=UTF-8''fattura%20n%C2%B01.pdf`.
+  Il nome va in questo header, non nella query string.
+
+La chiave deve avere il permesso `emails:send`. Funzionano sia le chiavi live
+sia quelle di test.
+
+**cURL**
+```bash
+curl -X POST https://api.tratto.email/v1/attachments \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/pdf" \
+  -H 'Content-Disposition: attachment; filename="fattura.pdf"' \
+  --data-binary @fattura.pdf
+```
+
+Usa `--data-binary`, non `-d`: `-d` toglie gli a capo e rovina il file.
+
+**Node.js**
+```javascript
+import { readFile } from 'node:fs/promises';
+
+const response = await fetch('https://api.tratto.email/v1/attachments', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer tratto_live_...',
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': 'attachment; filename="fattura.pdf"',
+  },
+  body: await readFile('fattura.pdf'),
+});
+const { data } = await response.json();
+console.log('Id allegato:', data.id);
+```
+
+**Python**
+```python
+import requests
+
+with open('fattura.pdf', 'rb') as f:
+    response = requests.post(
+        'https://api.tratto.email/v1/attachments',
+        headers={
+            'Authorization': 'Bearer tratto_live_...',
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'attachment; filename="fattura.pdf"',
+        },
+        data=f,
+    )
+attachment = response.json()['data']
+print(f"Id allegato: {attachment['id']}")
+```
+
+Gli SDK non hanno un metodo per caricare un file: caricalo via HTTP come
+negli esempi qui sopra.
+
+**Risposta (`201 Created`):**
+```json
+{
+  "data": {
+    "id": "att_V1StGXR8Z5jdHi6BmyT0a",
+    "filename": "fattura.pdf",
+    "contentType": "application/pdf",
+    "size": 48213,
+    "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "livemode": true,
+    "expiresAt": "2027-01-23T10:00:00.000Z"
+  }
+}
+```
+
+`size` è in byte e `sha256` è il digest esadecimale dei byte che hai inviato.
+`livemode` è `true` per un file caricato con una chiave live. Dopo `expiresAt`
+il file non si può più allegare (vedi [Conservazione](#conservazione)).
+
+### Nome e tipo
+
+- Il nome è obbligatorio: da 1 a 255 byte in UTF-8, senza caratteri di
+  controllo. Di un percorso resta solo l'ultimo segmento (`docs/fattura.pdf`
+  diventa `fattura.pdf`), e punti e spazi iniziali e finali vengono tolti. Un
+  nome mancante o non valido risponde `422 VALIDATION_ERROR` con
+  `details[0].path` uguale a `/filename`.
+- Il tipo viene salvato come lo dichiari, in minuscolo e senza parametri
+  (`text/csv; charset=utf-8` diventa `text/csv`). Un `Content-Type` mancante o
+  malformato viene salvato come `application/octet-stream`. Tratto non
+  confronta il tipo dichiarato con il contenuto, salvo per i
+  [file vietati](#file-vietati).
+- Caricare due volte lo stesso file dà due id, e ognuno conta nello
+  [spazio per gli allegati](#spazio-per-gli-allegati).
+
+### Frequenza dei caricamenti
+
+Un caricamento al secondo per chiave API (per persona nella dashboard). Oltre,
+l'API risponde `429 RATE_LIMITED` con `Retry-After: 1` e il messaggio
+`Rate limit exceeded: 1 attachment upload/second per API key.` Quando ci sono
+troppi caricamenti in corso nello stesso momento, risponde
+`503 SERVICE_UNAVAILABLE` con `Retry-After: 1` e
+`Too many uploads in progress. Retry after 1 second; nothing was stored.`
+In entrambi i casi si può riprovare senza rischi.
+
+## Dimensioni
+
+- **Ogni file**: al massimo 25 MB (25.000.000 byte). Un body più grande
+  risponde `413 PAYLOAD_TOO_LARGE` e non viene salvato niente.
+- **Ogni email**: i suoi allegati più il suo `html` e `text`, insieme, al
+  massimo 25 MB (25.000.000 byte). Un file da 25 MB ci sta; due file da 15 MB
+  no. Oltre il limite l'invio risponde `422 VALIDATION_ERROR` con
+  `details[0].path` uguale a `/attachments` e un messaggio con entrambe le
+  cifre, come
+  `This email is 30000000 bytes with its attachments, over the limit of 25000000 bytes.`
+  Il corpo di un template non viene contato quando invii con `templateId`.
+- **Numero di file**: nessun limite, dentro i 25 MB dell'email.
+
+<Callout type="warn">
+**Il server che riceve può accettare meno.** 25 MB è quello che accetta Tratto,
+non quello che ogni casella riceve. Molti server di posta rifiutano i messaggi
+oltre una dimensione loro, spesso indicata fra 10 e 25 MB, e nel messaggio un
+allegato occupa circa un terzo in più del file, perché è codificato in base64.
+Un messaggio troppo grande per il server del destinatario torna indietro come
+bounce. Per i file grandi, invia un link.
+</Callout>
+
+## File vietati
+
+Il caricamento viene rifiutato con `422 VALIDATION_ERROR` quando il file è uno
+di questi. `details[0].path` dice cosa è stato rifiutato: `/filename`,
+`/contentType` o `/body`.
+
+- **Estensioni che Amazon SES non invia**: la
+  [lista dei tipi di allegato non supportati](https://docs.aws.amazon.com/ses/latest/dg/attachments.html#mime-types)
+  (`.exe`, `.bat`, `.js`, `.vbs`, `.msi` e le altre lì elencate), maiuscole o
+  minuscole che siano. Conta l'ultima estensione del nome.
+- **HTML e SVG**: le estensioni `.html`, `.htm`, `.xhtml`, `.mht`, `.mhtml` e
+  `.svg`, e i tipi `text/html`, `application/xhtml+xml`, `image/svg+xml` e
+  `multipart/related`.
+- **Eseguibili e script, riconosciuti dal contenuto** qualunque sia il nome e
+  il tipo dichiarato: programmi Windows, Linux e macOS, script che iniziano con
+  `#!` e collegamenti di Windows. Rinominare `setup.exe` in `setup.pdf` non lo
+  fa passare.
+
+Gli archivi come i file ZIP vengono accettati e non vengono aperti, quindi il
+loro contenuto non viene controllato.
+
+<Callout type="warn">
+**Gli allegati non vengono analizzati contro il malware.** I controlli qui
+sopra rifiutano tipi di file, niente di più: un PDF o un documento Office con
+contenuto dannoso viene accettato e inviato. Dei file che invii sei
+responsabile tu.
+</Callout>
+
+## Allegare file a un'email
+
+Passa gli id in `attachments`, un array di oggetti con un solo campo, `id`:
+
+```bash
+curl -X POST https://api.tratto.email/v1/emails \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "billing@yourdomain.com",
+    "to": "user@example.com",
+    "subject": "La tua fattura",
+    "text": "In allegato trovi la fattura.",
+    "attachments": [{ "id": "att_V1StGXR8Z5jdHi6BmyT0a" }]
+  }'
+```
+
+Il destinatario vede ogni file con il nome e il tipo con cui è stato caricato.
+L'invio viene controllato prima che venga scritto o addebitato qualcosa:
+
+| Stato | Codice | Quando |
+|---|---|---|
+| 403 | `PLAN_UPGRADE_REQUIRED` | Il workspace è sul piano Free |
+| 404 | `NOT_FOUND` | Un id che non esiste in questo workspace (`Attachment 'att_...' not found.`). Anche l'id di un altro workspace è un 404 |
+| 422 | `VALIDATION_ERROR` | Un id ripetuto; un file caricato con una chiave live inviato con una chiave di test, o il contrario; un file che scade meno di un'ora dopo l'invio; l'email oltre i 25 MB con i suoi file |
+
+`GET /v1/emails/{id}` restituisce i file dell'email com'erano quando è stata
+accettata:
+
+```json
+"attachments": [
+  { "id": "att_V1StGXR8Z5jdHi6BmyT0a", "filename": "fattura.pdf", "contentType": "application/pdf", "size": 48213 }
+]
+```
+
+### In un batch
+
+Ogni email di un [batch](/it/docs/send-batch) accetta anche `attachments`, con
+le stesse regole. Carica una volta il file comune e usa lo stesso id in ogni
+email. I byte dei file non contano nei limiti di 900 KB per email e 9 MiB per
+batch, perché il batch contiene solo gli id. Un errore su un'email rifiuta
+l'intero batch, e `details[].path` indica l'email.
+
+### Email programmate
+
+Con `scheduledAt`, ogni file deve sopravvivere all'orario programmato di almeno
+un'ora, altrimenti l'invio risponde `422`. Riprogrammare con
+`PATCH /v1/emails/{id}` ricontrolla i file: se uno scadrebbe prima del nuovo
+orario, o è stato eliminato, l'API risponde `422 VALIDATION_ERROR` e l'email
+mantiene l'orario precedente.
+
+## Quando un file manca all'invio
+
+Il file viene letto quando l'email parte, non quando viene accettata. Se a quel
+punto è stato eliminato o è scaduto, l'email non parte:
+
+- il suo status diventa `failed`, con `failureReason` uguale a
+  `attachment_unavailable` su `GET /v1/emails/{id}`;
+- un evento `failed` con `data.reason` uguale a `attachment_unavailable` arriva
+  ai webhook iscritti a `failed` (vedi
+  [Evento failed](/it/docs/webhooks#evento-failed));
+- la quota dell'email viene restituita, come se non fosse mai stata inviata.
+
+## Conservazione
+
+Un file caricato con una chiave live scade **90 giorni** dopo il caricamento;
+uno caricato con una chiave di test, dopo **7 giorni**. Lo dice `expiresAt`
+nella risposta del caricamento. Dopo quella data il file non si può più
+allegare, e i suoi byte vengono rimossi nel giro di qualche giorno.
+
+Per continuare a inviare un file più a lungo, caricalo di nuovo e usa il nuovo
+id.
+
+## Spazio per gli allegati
+
+Ogni workspace può tenere **1 GB (1.000.000.000 byte)** di allegati alla volta,
+live e test insieme, su ogni piano che include gli allegati. Ogni caricamento
+conta finché non viene eliminato o non scade; i file scaduti vengono liberati
+da una pulizia che gira una volta al giorno. Un caricamento che supererebbe il
+limite risponde `429 QUOTA_EXCEEDED`, e il messaggio dice quanto spazio è in
+uso:
+
+```json
+{
+  "error": {
+    "code": "QUOTA_EXCEEDED",
+    "message": "Attachment storage limit reached: 999000000 of 1000000000 bytes used, this file is 2000000 bytes.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes",
+    "suggestion": "Delete attachments you no longer need (DELETE /v1/attachments/{id}); expired ones are released automatically."
+  }
+}
+```
+
+Riprovare non serve: elimina i file che non ti servono più, o aspetta che
+alcuni scadano.
+
+## Leggere ed eliminare un allegato
+
+`GET /v1/attachments/{id}` restituisce gli stessi campi della risposta del
+caricamento (permesso `emails:read`). Restituisce solo i metadati: i byte di un
+file non vengono mai restituiti. Non esiste un endpoint che elenchi gli
+allegati, quindi conserva gli id che ricevi.
+
+`DELETE /v1/attachments/{id}` rimuove il file e libera subito il suo spazio
+(permesso `emails:send`). Risponde `204` senza body. Le email già accettate con
+quel file e non ancora partite falliranno con `attachment_unavailable`, come
+descritto [sopra](#quando-un-file-manca-allinvio).
+
+```bash
+curl -X DELETE https://api.tratto.email/v1/attachments/att_V1StGXR8Z5jdHi6BmyT0a \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+## Test mode
+
+Un file caricato con una chiave di test è un file di test (`livemode: false`):
+si può allegare solo alle email inviate con una chiave di test, e un file live
+solo alle email inviate con una chiave live. In [test mode](/it/docs/test-mode)
+i file vengono controllati quando l'email viene accettata, e il simulatore non
+li legge mai.
+
+## Errori
+
+| Rotta | Stato | Codice | Quando |
+|---|---|---|---|
+| `POST /v1/attachments` | 403 | `PLAN_UPGRADE_REQUIRED` | Il workspace è sul piano Free |
+| `POST /v1/attachments` | 403 | `FORBIDDEN` | La chiave non ha il permesso `emails:send` |
+| `POST /v1/attachments` | 413 | `PAYLOAD_TOO_LARGE` | Il file supera i 25 MB |
+| `POST /v1/attachments` | 422 | `VALIDATION_ERROR` | Body vuoto, nome mancante o non valido, un [file vietato](#file-vietati) |
+| `POST /v1/attachments` | 429 | `QUOTA_EXCEEDED` | Lo spazio del workspace è pieno |
+| `POST /v1/attachments` | 429 | `RATE_LIMITED` | Più di un caricamento al secondo |
+| `POST /v1/attachments` | 503 | `SERVICE_UNAVAILABLE` | Troppi caricamenti in corso; riprova dopo `Retry-After` |
+| `GET`, `DELETE /v1/attachments/{id}` | 404 | `NOT_FOUND` | Nessun allegato con quell'id in questo workspace |
+| `POST /v1/emails`, `POST /v1/emails/batch` | 403, 404, 422 | | Vedi [Allegare file a un'email](#allegare-file-a-unemail) |

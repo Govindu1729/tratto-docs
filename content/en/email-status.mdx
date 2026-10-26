@@ -40,7 +40,7 @@ status.
 | `delivered` | The recipient's mail server confirmed receipt |
 | `bounced` | The recipient's mail server rejected the email |
 | `complained` | The recipient marked the email as spam |
-| `failed` | Email delivery failed (invalid domain, mailbox full, an unpublished template, etc.). The reason is recorded on the email document, but nothing exposes it today: `GET /v1/emails/:id` returns the status and not the reason, and the dashboard reads that same endpoint |
+| `failed` | Tratto did not send the email (an unverified sender domain, an unpublished template, an attachment that was deleted, a refusal by the mail provider, etc.). With API 0.29.0 or later the reason is in `failureReason`: see [Why an email failed](#why-an-email-failed) |
 | `skipped` | Tratto did not send the email because the recipient unsubscribed or is on the suppression list. Nothing was sent |
 | `canceled` | You canceled a `scheduled` email with `DELETE /v1/emails/:id` before it was sent |
 
@@ -61,6 +61,22 @@ reports a delivery, a bounce or a complaint for it, the status moves to
 
 An email that stays in `sending` for more than a few minutes is in this
 situation and will be closed as `failed` when Tratto picks it up again.
+
+### Why an email failed
+
+Requires API 0.29.0 or later.
+
+`GET /v1/emails/{id}` and `GET /v1/emails` return `failureReason` on a
+`failed` email: a stable code such as `template_not_published`,
+`provider_rejected` or `attachment_unavailable`. The same code arrives as
+`data.reason` in the `failed` [webhook event](/en/docs/webhooks#the-failed-event),
+whose `data.error` adds a sentence for people. The list of codes and their
+meaning is in [The failed event](/en/docs/webhooks#the-failed-event). New codes
+may be added, so handle values you do not know. Emails that failed before this
+field existed have no `failureReason`.
+
+`interrupted` is the only code that is not final: see
+[When delivery is interrupted](#when-delivery-is-interrupted).
 
 ### State Transitions
 
@@ -156,6 +172,7 @@ echo "Created: {$email['createdAt']}\n";
 | `bounced` | Mail server rejected delivery (hard or soft bounce) |
 | `complained` | Recipient marked email as spam |
 | `unsubscribed` | Recipient clicked unsubscribe link |
+| `failed` | The email was not sent; `data.reason` and `data.error` say why (requires API 0.29.0 or later) |
 
 ### Get Email Events
 

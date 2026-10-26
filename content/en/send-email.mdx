@@ -192,13 +192,12 @@ the `variables` you pass; a variable you don't pass becomes an empty string.
 
 **The template has to be published.** This request does not read the template,
 so it still answers `202` for a `draft` one, but the email is then marked
-`status: "failed"` and never leaves. The reason,
-`Template 'tmpl_abc123' is not published and cannot be used to send.`, is
-recorded on the email document and stops there: `GET /v1/emails/:id` does not
-return it, and neither does the dashboard, which reads that same endpoint. So
-what you see is a `failed` email and no explanation. Publish the template
-before you send: see
-[Templates](/en/docs/templates#publish-before-you-send).
+`status: "failed"` and never leaves. With API 0.29.0 or later
+`GET /v1/emails/{id}` returns `failureReason: "template_not_published"`, and
+webhooks subscribed to `failed` receive a
+[`failed` event](/en/docs/webhooks#the-failed-event); before that version the
+email showed `failed` with no explanation. Publish the template before you
+send: see [Templates](/en/docs/templates#publish-before-you-send).
 
 ## Recipients: to, cc and bcc
 
@@ -351,13 +350,33 @@ HTTP as shown above.
 
 ## Attachments
 
-Attachments are not supported yet: `POST /v1/emails` has no `attachments`
-field. With API 0.24.0 or later, a request that sends one fails with
-`422 VALIDATION_ERROR` on path `/attachments`, with the message
-`attachments are not supported yet.`, and nothing is sent. Earlier versions
-ignored the field and sent the email without the file. Attachments are on the
-roadmap. Until then, link to the
-file from the email body instead.
+Requires API 0.29.0 or later, and a Starter, Growth or Scale plan.
+
+Upload each file first with `POST /v1/attachments`, then pass the ids it
+returns in `attachments`:
+
+```bash
+curl -X POST https://api.tratto.email/v1/emails \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "billing@yourdomain.com",
+    "to": "user@example.com",
+    "subject": "Your invoice",
+    "text": "Your invoice is attached.",
+    "attachments": [{ "id": "att_V1StGXR8Z5jdHi6BmyT0a" }]
+  }'
+```
+
+The email, its `html` and `text` and its files together can be at most 25 MB
+(25,000,000 bytes), with no limit on the number of files. An unknown id is
+`404 NOT_FOUND`; an id listed twice, a file of the other mode (live or test),
+one that expires less than an hour after the send, or an email over 25 MB is
+`422 VALIDATION_ERROR`; on Free the send is `403 PLAN_UPGRADE_REQUIRED`.
+Nothing is written or charged in any of these cases.
+
+How to upload, the size limits, the forbidden file types, retention and
+storage are in [Attachments](/en/docs/attachments).
 
 ## Tags for Organization
 
@@ -396,6 +415,7 @@ Later, filter emails by tags or use them in webhooks.
 | `tags` | string[] | | Organization tags |
 | `replyTo` | string | | Reply-to address. If omitted on a request without `from`, the `replyTo` of the transactional sender applies |
 | `headers` | object | | Custom email headers (advanced) |
+| `attachments` | object[] | | Files uploaded with `POST /v1/attachments`, as `[{ "id": "att_..." }]` (requires API 0.29.0 or later). See [Attachments](#attachments) |
 
 ### Unknown fields
 
@@ -497,8 +517,8 @@ reuse the same key. See [Idempotency](/en/docs/idempotency).
 
 **Cause:** Invalid request (missing required field, malformed JSON, more than
 50 distinct recipients across `to`, `cc` and `bcc`, an
-[unknown field](#unknown-fields) or `attachments` with API 0.24.0 or later,
-etc.).
+[unknown field](#unknown-fields) with API 0.24.0 or later, an invalid
+[attachment](#attachments), etc.).
 
 **Fix:** Check the error message and refer to the [Error Codes](/en/docs/error-codes) reference.
 

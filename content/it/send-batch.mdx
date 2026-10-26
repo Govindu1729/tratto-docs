@@ -65,7 +65,11 @@ Regole per ogni email del batch:
 - Accetta tutti i campi di [`POST /v1/emails`](/it/docs/send-email#riferimento-completo-del-request-body)
   tranne `scheduledAt`. Per programmare un invio, manda l'email da sola con
   `POST /v1/emails`.
-- `attachments` non è accettato: risponde 422.
+- `attachments` è accettato con l'API 0.29.0 o successiva, con le stesse
+  regole dell'invio singolo. Carica un file una volta sola e usa lo stesso id
+  in ogni email che ne ha bisogno: il batch contiene solo gli id, quindi i
+  file non contano nei limiti di dimensione qui sotto. Vedi
+  [Allegati](/it/docs/attachments#in-un-batch).
 - Un campo sconosciuto risponde 422: sia il body sia ogni email sono
   controllati in modo stretto. `POST /v1/emails` fa lo stesso con l'API 0.24.0
   o successiva, vedi [Campi sconosciuti](/it/docs/send-email#campi-sconosciuti).
@@ -192,8 +196,10 @@ il messaggio `Rate limit exceeded: 10 batch requests/second per API key.` Vedi
 
 | Stato | Codice | Quando | Scritto o addebitato |
 |---|---|---|---|
-| 422 | `VALIDATION_ERROR` | 0 o più di 100 email; un'email non valida; più di 50 destinatari in un'email; `scheduledAt`, `attachments` o un campo sconosciuto; un header riservato; nessun mittente; un'email oltre 900 KB o un batch oltre 9 MiB dopo il render | Niente |
+| 422 | `VALIDATION_ERROR` | 0 o più di 100 email; un'email non valida; più di 50 destinatari in un'email; `scheduledAt` o un campo sconosciuto; un allegato non valido, come nell'invio singolo; un header riservato; nessun mittente; un'email oltre 900 KB o un batch oltre 9 MiB dopo il render | Niente |
 | 403 | `FORBIDDEN` | Il dominio mittente di un'email non è verificato (`emails[i]: …`). Controllato solo con una chiave live | Niente |
+| 403 | `PLAN_UPGRADE_REQUIRED` | Un'email ha `attachments` e il workspace è sul piano Free | Niente |
+| 404 | `NOT_FOUND` | Un id di allegato che non esiste in questo workspace; `details[].path` indica l'email | Niente |
 | 413 | `PAYLOAD_TOO_LARGE` | Body della richiesta oltre 5 MiB | Niente |
 | 429 | `QUOTA_EXCEEDED` | Restano meno email di quanti destinatari ha il batch in totale | Niente |
 | 429 | `RATE_LIMITED` | Più di 10 batch al secondo per chiave, o un altro rate limit. Riprova dopo `Retry-After` se presente, altrimenti dopo un breve backoff | Niente |

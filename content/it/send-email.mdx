@@ -195,13 +195,12 @@ vuota.
 
 **Il template deve essere pubblicato.** Questa richiesta non legge il template,
 quindi risponde comunque `202` anche per uno in `draft`, ma l'email viene poi
-marcata `status: "failed"` e non parte. Il motivo,
-`Template 'tmpl_abc123' is not published and cannot be used to send.`, viene
-registrato sul documento dell'email e si ferma lì: `GET /v1/emails/:id` non lo
-restituisce, e nemmeno la dashboard, che legge quello stesso endpoint. Quindi
-quello che vedi è un'email `failed` e nessuna spiegazione. Pubblica il template
-prima di inviare: vedi
-[Template](/it/docs/templates#pubblica-prima-di-inviare).
+marcata `status: "failed"` e non parte. Con l'API 0.29.0 o successiva
+`GET /v1/emails/{id}` restituisce `failureReason: "template_not_published"`, e
+i webhook iscritti a `failed` ricevono un
+[evento `failed`](/it/docs/webhooks#evento-failed); prima di quella versione
+l'email risultava `failed` senza spiegazione. Pubblica il template prima di
+inviare: vedi [Template](/it/docs/templates#pubblica-prima-di-inviare).
 
 ## Destinatari: to, cc e bcc
 
@@ -353,13 +352,34 @@ via HTTP come negli esempi qui sopra.
 
 ## Allegati
 
-Gli allegati non sono ancora supportati: `POST /v1/emails` non ha un campo
-`attachments`. Con l'API 0.24.0 o successiva, una richiesta che lo invia
-fallisce con `422 VALIDATION_ERROR` sul path `/attachments`, con il messaggio
-`attachments are not supported yet.`, e non parte niente. Le versioni
-precedenti ignoravano il campo e inviavano l'email senza il file. Gli allegati
-sono in roadmap. Nel frattempo, metti nel
-corpo dell'email un link al file.
+Richiede l'API 0.29.0 o successiva, e un piano Starter, Growth o Scale.
+
+Carica prima ogni file con `POST /v1/attachments`, poi passa gli id che
+restituisce in `attachments`:
+
+```bash
+curl -X POST https://api.tratto.email/v1/emails \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "billing@yourdomain.com",
+    "to": "user@example.com",
+    "subject": "La tua fattura",
+    "text": "In allegato trovi la fattura.",
+    "attachments": [{ "id": "att_V1StGXR8Z5jdHi6BmyT0a" }]
+  }'
+```
+
+L'email, il suo `html` e `text` e i suoi file insieme possono arrivare al
+massimo a 25 MB (25.000.000 byte), senza limite sul numero di file. Un id
+sconosciuto è `404 NOT_FOUND`; un id ripetuto, un file dell'altra modalità
+(live o test), uno che scade meno di un'ora dopo l'invio, o un'email oltre i
+25 MB è `422 VALIDATION_ERROR`; sul piano Free l'invio è
+`403 PLAN_UPGRADE_REQUIRED`. In nessuno di questi casi viene scritto o
+addebitato qualcosa.
+
+Come caricare i file, i limiti di dimensione, i tipi vietati, la conservazione
+e lo spazio sono in [Allegati](/it/docs/attachments).
 
 ## Tag per l'Organizzazione
 
@@ -398,6 +418,7 @@ Successivamente, filtra le email per tag o usali nei webhook.
 | `tags` | string[] | | Tag di organizzazione |
 | `replyTo` | string | | Indirizzo di risposta. Se omesso in una richiesta senza `from`, si applica il `replyTo` del mittente transazionale |
 | `headers` | object | | Custom email headers (avanzato) |
+| `attachments` | object[] | | File caricati con `POST /v1/attachments`, come `[{ "id": "att_..." }]` (richiede l'API 0.29.0 o successiva). Vedi [Allegati](#allegati) |
 
 ### Campi sconosciuti
 
@@ -501,8 +522,8 @@ risponde `202`.
 
 **Causa:** Richiesta non valida (campo mancante, JSON malformato, più di 50
 destinatari distinti fra `to`, `cc` e `bcc`, un
-[campo sconosciuto](#campi-sconosciuti) o `attachments` con l'API 0.24.0 o
-successiva, ecc.).
+[campo sconosciuto](#campi-sconosciuti) con l'API 0.24.0 o successiva, un
+[allegato](#allegati) non valido, ecc.).
 
 **Fix:** Controlla il messaggio di errore e consulta il riferimento [Codici di Errore](/it/docs/error-codes).
 

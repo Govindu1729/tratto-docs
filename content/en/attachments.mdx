@@ -1,0 +1,321 @@
+---
+title: Attachments
+description: Upload a file once, then attach it by id to single sends and batches.
+---
+
+Requires API 0.29.0 or later.
+
+Sending a file takes two steps:
+
+1. **Upload it** with `POST /v1/attachments`. The response gives you an id,
+   `att_` followed by 21 characters.
+2. **Reference the id** in the `attachments` field of
+   [`POST /v1/emails`](/en/docs/send-email) or of any email of a
+   [batch](/en/docs/send-batch).
+
+An upload is not tied to one email. Until it expires, the same id can be
+attached to as many emails as you like, so a file that goes to many people
+(terms of service, a price list) is uploaded once and every email of a batch
+points to it, instead of carrying its own copy of the bytes.
+
+## Plan availability
+
+Attachments are included from **Starter** onward (Starter, Growth and Scale),
+not on Free. On a Free workspace both the upload and a send that carries
+`attachments` answer `403 PLAN_UPGRADE_REQUIRED`:
+
+```json
+{
+  "error": {
+    "code": "PLAN_UPGRADE_REQUIRED",
+    "message": "This feature is not included in your plan. Upgrade to use it.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes",
+    "suggestion": "Attachments are available from the Starter plan. The account owner can upgrade at https://app.tratto.email/settings/billing."
+  }
+}
+```
+
+## Upload a file
+
+The body of `POST /v1/attachments` is the **file itself**, as raw bytes: not
+JSON and not `multipart/form-data`. Two headers describe it:
+
+- `Content-Type`: the type of the file, such as `application/pdf`.
+- `Content-Disposition`: the filename, as
+  `attachment; filename="invoice.pdf"`. For a name with non-ASCII characters
+  use the encoded form, `attachment; filename*=UTF-8''fattura%20n%C2%B01.pdf`.
+  The filename goes in this header, not in the query string.
+
+The key needs the `emails:send` permission. Live and test keys both work.
+
+**cURL**
+```bash
+curl -X POST https://api.tratto.email/v1/attachments \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/pdf" \
+  -H 'Content-Disposition: attachment; filename="invoice.pdf"' \
+  --data-binary @invoice.pdf
+```
+
+Use `--data-binary`, not `-d`: `-d` strips line breaks and corrupts the file.
+
+**Node.js**
+```javascript
+import { readFile } from 'node:fs/promises';
+
+const response = await fetch('https://api.tratto.email/v1/attachments', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer tratto_live_...',
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': 'attachment; filename="invoice.pdf"',
+  },
+  body: await readFile('invoice.pdf'),
+});
+const { data } = await response.json();
+console.log('Attachment id:', data.id);
+```
+
+**Python**
+```python
+import requests
+
+with open('invoice.pdf', 'rb') as f:
+    response = requests.post(
+        'https://api.tratto.email/v1/attachments',
+        headers={
+            'Authorization': 'Bearer tratto_live_...',
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'attachment; filename="invoice.pdf"',
+        },
+        data=f,
+    )
+attachment = response.json()['data']
+print(f"Attachment id: {attachment['id']}")
+```
+
+The SDKs have no upload method: upload over HTTP as shown above.
+
+**Response (`201 Created`):**
+```json
+{
+  "data": {
+    "id": "att_V1StGXR8Z5jdHi6BmyT0a",
+    "filename": "invoice.pdf",
+    "contentType": "application/pdf",
+    "size": 48213,
+    "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "livemode": true,
+    "expiresAt": "2027-01-23T10:00:00.000Z"
+  }
+}
+```
+
+`size` is in bytes and `sha256` is the hex digest of the bytes you sent.
+`livemode` is `true` for a file uploaded with a live key. After `expiresAt`
+the file can no longer be attached (see [Retention](#retention)).
+
+### Filename and type
+
+- The filename is required: 1 to 255 bytes once encoded as UTF-8, with no
+  control characters. Only the last segment of a path is kept
+  (`docs/invoice.pdf` becomes `invoice.pdf`), and leading and trailing dots
+  and spaces are removed. A missing or invalid name answers
+  `422 VALIDATION_ERROR` with `details[0].path` set to `/filename`.
+- The type is stored as you declare it, lower-cased and without parameters
+  (`text/csv; charset=utf-8` becomes `text/csv`). A missing or malformed
+  `Content-Type` is stored as `application/octet-stream`. Tratto does not
+  compare the declared type with the content, except for the
+  [forbidden files](#forbidden-files).
+- Uploading the same file twice gives two ids, and each counts toward the
+  [storage limit](#storage-limit).
+
+### Upload rate
+
+One upload per second per API key (per person in the dashboard). Over it the
+API answers `429 RATE_LIMITED` with `Retry-After: 1` and the message
+`Rate limit exceeded: 1 attachment upload/second per API key.` When too many
+uploads are in progress at once, it answers `503 SERVICE_UNAVAILABLE` with
+`Retry-After: 1` and `Too many uploads in progress. Retry after 1 second; nothing was stored.`
+Both are safe to retry.
+
+## Size
+
+- **Each file**: at most 25 MB (25,000,000 bytes). A larger body answers
+  `413 PAYLOAD_TOO_LARGE` and nothing is stored.
+- **Each email**: its attachments plus its `html` and `text` body, together,
+  at most 25 MB (25,000,000 bytes). One 25 MB file fits; two 15 MB files do
+  not. Over the limit the send answers `422 VALIDATION_ERROR` with
+  `details[0].path` set to `/attachments` and a message with both figures,
+  such as
+  `This email is 30000000 bytes with its attachments, over the limit of 25000000 bytes.`
+  The body of a template is not counted when you send with `templateId`.
+- **Number of files**: no limit, within the 25 MB of the email.
+
+<Callout type="warn">
+**The receiving server may accept less.** 25 MB is what Tratto accepts, not
+what every mailbox receives. Many mail servers refuse messages above a size
+of their own, often quoted between 10 and 25 MB, and in the message an
+attachment takes about a third more space than the file, because it is
+encoded as base64. A message that is too big for the recipient's server comes
+back as a bounce. For large files, send a link instead.
+</Callout>
+
+## Forbidden files
+
+The upload is refused with `422 VALIDATION_ERROR` when the file is one of
+these. `details[0].path` says what was refused: `/filename`, `/contentType` or
+`/body`.
+
+- **Extensions that Amazon SES does not send**: the
+  [list of unsupported attachment types](https://docs.aws.amazon.com/ses/latest/dg/attachments.html#mime-types)
+  (`.exe`, `.bat`, `.js`, `.vbs`, `.msi` and the others there), whatever their
+  case. The last extension of the name is what counts.
+- **HTML and SVG**: the extensions `.html`, `.htm`, `.xhtml`, `.mht`,
+  `.mhtml` and `.svg`, and the types `text/html`, `application/xhtml+xml`,
+  `image/svg+xml` and `multipart/related`.
+- **Executables and scripts, recognised by their content** whatever the name
+  and the declared type: Windows, Linux and macOS programs, scripts that start
+  with `#!`, and Windows shortcuts. Renaming `setup.exe` to `setup.pdf` does
+  not get it through.
+
+Archives such as ZIP files are accepted and not opened, so what is inside them
+is not checked.
+
+<Callout type="warn">
+**Attachments are not scanned for malware.** The checks above refuse types of
+file, nothing more: a PDF or an Office document with harmful content is
+accepted and sent. You are responsible for the files you send.
+</Callout>
+
+## Attach files to an email
+
+Pass the ids in `attachments`, an array of objects with one field, `id`:
+
+```bash
+curl -X POST https://api.tratto.email/v1/emails \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "billing@yourdomain.com",
+    "to": "user@example.com",
+    "subject": "Your invoice",
+    "text": "Your invoice is attached.",
+    "attachments": [{ "id": "att_V1StGXR8Z5jdHi6BmyT0a" }]
+  }'
+```
+
+The recipient sees each file with the filename and type it was uploaded with.
+The send is checked before anything is written or charged:
+
+| Status | Code | When |
+|---|---|---|
+| 403 | `PLAN_UPGRADE_REQUIRED` | The workspace is on Free |
+| 404 | `NOT_FOUND` | An id that does not exist in this workspace (`Attachment 'att_...' not found.`). An id of another workspace is a 404 too |
+| 422 | `VALIDATION_ERROR` | An id listed more than once; a file uploaded with a live key sent with a test key, or the reverse; a file that expires less than one hour after the send; the email over 25 MB with its files |
+
+`GET /v1/emails/{id}` returns the files of the email as they were when it was
+accepted:
+
+```json
+"attachments": [
+  { "id": "att_V1StGXR8Z5jdHi6BmyT0a", "filename": "invoice.pdf", "contentType": "application/pdf", "size": 48213 }
+]
+```
+
+### In a batch
+
+Every email of a [batch](/en/docs/send-batch) takes `attachments` too, with
+the same rules. Upload a shared file once and reference the same id from
+every email. The file bytes do not count toward the 900 KB per email and
+9 MiB per batch limits, because the batch carries only the ids. An error on
+one email rejects the whole batch, and `details[].path` names the email.
+
+### Scheduled emails
+
+With `scheduledAt`, every file has to outlive the scheduled time by at least
+one hour, or the send answers `422`. Rescheduling with
+`PATCH /v1/emails/{id}` checks the files again: if one would expire before the
+new time, or has been deleted, the API answers `422 VALIDATION_ERROR` and the
+email keeps its old time.
+
+## When a file is gone at send time
+
+The file is read when the email is sent, not when it is accepted. If it has
+been deleted or has expired by then, the email is not sent:
+
+- its status becomes `failed`, with `failureReason` set to
+  `attachment_unavailable` on `GET /v1/emails/{id}`;
+- a `failed` event with `data.reason` set to `attachment_unavailable` is
+  delivered to the webhooks subscribed to `failed` (see
+  [The failed event](/en/docs/webhooks#the-failed-event));
+- the email's quota is given back, as if it had never been sent.
+
+## Retention
+
+A file uploaded with a live key expires **90 days** after the upload; one
+uploaded with a test key, after **7 days**. The `expiresAt` of the upload
+response says when. After it the file can no longer be attached, and its bytes
+are removed within days.
+
+To keep sending a file for longer, upload it again and use the new id.
+
+## Storage limit
+
+Each workspace can hold **1 GB (1,000,000,000 bytes)** of attachments at once,
+live and test together, on every plan that includes attachments. Every upload
+counts until it is deleted or has expired; expired files are released by a
+cleanup that runs once a day. An upload that would go over the limit answers
+`429 QUOTA_EXCEEDED`, and the message says how much is in use:
+
+```json
+{
+  "error": {
+    "code": "QUOTA_EXCEEDED",
+    "message": "Attachment storage limit reached: 999000000 of 1000000000 bytes used, this file is 2000000 bytes.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes",
+    "suggestion": "Delete attachments you no longer need (DELETE /v1/attachments/{id}); expired ones are released automatically."
+  }
+}
+```
+
+Retrying does not help: delete files you no longer need, or wait for some to
+expire.
+
+## Read and delete an attachment
+
+`GET /v1/attachments/{id}` returns the same fields as the upload response
+(permission `emails:read`). It returns the metadata only: the bytes of a file
+are never served back. There is no endpoint that lists attachments, so keep
+the ids you get.
+
+`DELETE /v1/attachments/{id}` removes the file and frees its storage at once
+(permission `emails:send`). It answers `204` with no body. Emails already
+accepted with that file and not yet sent will fail with
+`attachment_unavailable`, as described [above](#when-a-file-is-gone-at-send-time).
+
+```bash
+curl -X DELETE https://api.tratto.email/v1/attachments/att_V1StGXR8Z5jdHi6BmyT0a \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+## Test mode
+
+A file uploaded with a test key is a test file (`livemode: false`): it can be
+attached only to emails sent with a test key, and a live file only to emails
+sent with a live key. In [test mode](/en/docs/test-mode) the files are checked
+when the email is accepted, and the simulator never reads them.
+
+## Errors
+
+| Route | Status | Code | When |
+|---|---|---|---|
+| `POST /v1/attachments` | 403 | `PLAN_UPGRADE_REQUIRED` | The workspace is on Free |
+| `POST /v1/attachments` | 403 | `FORBIDDEN` | The key lacks the `emails:send` permission |
+| `POST /v1/attachments` | 413 | `PAYLOAD_TOO_LARGE` | The file is over 25 MB |
+| `POST /v1/attachments` | 422 | `VALIDATION_ERROR` | Empty body, missing or invalid filename, a [forbidden file](#forbidden-files) |
+| `POST /v1/attachments` | 429 | `QUOTA_EXCEEDED` | The workspace storage is full |
+| `POST /v1/attachments` | 429 | `RATE_LIMITED` | More than one upload per second |
+| `POST /v1/attachments` | 503 | `SERVICE_UNAVAILABLE` | Too many uploads in progress; retry after `Retry-After` |
+| `GET`, `DELETE /v1/attachments/{id}` | 404 | `NOT_FOUND` | No attachment with that id in this workspace |
+| `POST /v1/emails`, `POST /v1/emails/batch` | 403, 404, 422 | | See [Attach files to an email](#attach-files-to-an-email) |

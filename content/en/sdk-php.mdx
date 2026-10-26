@@ -118,7 +118,7 @@ array goes out as a JSON array. For fields that are objects, such as
 
 The array is sent as it is, so keys must match the API's camelCase field
 names. With API 0.24.0 or later, a key the API does not know, such as
-`reply_to` or `attachments`, fails with `422 VALIDATION_ERROR` instead of being
+`reply_to` or `scheduled_at`, fails with `422 VALIDATION_ERROR` instead of being
 dropped. See [Unknown fields](/en/docs/send-email#unknown-fields).
 
 ## Send a Batch
