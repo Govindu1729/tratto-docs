@@ -127,6 +127,32 @@ quelle, in un nuovo batch con una **nuova** chiave. Dopo un `TrattoError` 503
 o 500 non è partito niente, e ripetere con la **stessa** chiave è sicuro.
 Quota, limiti ed errori sono in [Invio in Batch](/it/docs/send-batch).
 
+## Allegati
+
+Richiede la **`tratto-email` 2.2.0 o successiva** e un piano a pagamento: il piano Free
+risponde `403 PLAN_UPGRADE_REQUIRED`. Prima carica il file, poi indicane l'id
+in `emails.send()` o `emails.send_batch()`.
+
+```python
+with open('fattura.pdf', 'rb') as f:
+    file = client.attachments.upload(
+        f, filename='fattura.pdf', content_type='application/pdf'
+    )
+
+client.emails.send(SendEmailOptions(
+    from_='billing@yourdomain.com',
+    to='alice@example.com',
+    subject='La tua fattura',
+    html='<p>In allegato.</p>',
+    attachments=[{'id': file['id']}],
+))
+
+meta = client.attachments.get(file['id'])  # solo i metadati, mai i byte
+client.attachments.delete(file['id'])
+```
+
+Il contenuto può essere `bytes` o un file aperto in modalità binaria. Limiti, scadenza e spazio sono in [Allegati](/it/docs/attachments).
+
 ## Ottieni Status Email
 
 ```python

@@ -148,6 +148,34 @@ nuovo batch con una **nuova** chiave. Dopo un 503 o un 500 non è partito
 niente: ripeti la stessa chiamata con la **stessa** chiave. Quota, limiti ed
 errori sono in [Invio in Batch](/it/docs/send-batch).
 
+## Allegati
+
+Richiede la **`@tratto/email` 1.7.0 o successiva** e un piano a pagamento: il piano Free
+risponde `403 PLAN_UPGRADE_REQUIRED`. Prima carica il file, poi indicane l'id
+in `emails.send()` o `emails.sendBatch()`.
+
+```typescript
+import { readFile } from 'node:fs/promises';
+
+const file = await tratto.attachments.upload(await readFile('fattura.pdf'), {
+  filename: 'fattura.pdf',
+  contentType: 'application/pdf',
+});
+
+await tratto.emails.send({
+  from: 'billing@yourdomain.com',
+  to: 'alice@example.com',
+  subject: 'La tua fattura',
+  html: '<p>In allegato.</p>',
+  attachments: [{ id: file.id }],
+});
+
+const meta = await tratto.attachments.get(file.id); // solo i metadati, mai i byte
+await tratto.attachments.delete(file.id);
+```
+
+Il contenuto può essere un `Buffer`, un `Uint8Array`, un `ArrayBuffer` o un `Blob`. Limiti, scadenza e spazio sono in [Allegati](/it/docs/attachments).
+
 ## Leggi lo Status di un'Email
 
 ```typescript

@@ -95,8 +95,44 @@ attachment = response.json()['data']
 print(f"Id allegato: {attachment['id']}")
 ```
 
-Gli SDK non hanno un metodo per caricare un file: caricalo via HTTP come
-negli esempi qui sopra.
+Con un SDK, `attachments.upload` imposta i due header al posto tuo, anche
+per i nomi di file con caratteri non ASCII, e restituisce l'oggetto `data`
+della risposta. `attachments.get` e `attachments.delete` coprono gli altri due
+endpoint.
+
+**SDK Node.js** (richiede `@tratto/email` 1.7.0 o successiva)
+```typescript
+import { readFile } from 'node:fs/promises';
+
+const file = await tratto.attachments.upload(await readFile('fattura.pdf'), {
+  filename: 'fattura.pdf',
+  contentType: 'application/pdf',
+});
+console.log('Id allegato:', file.id);
+```
+
+Il contenuto può essere un `Buffer`, un `Uint8Array`, un `ArrayBuffer` o un
+`Blob`.
+
+**SDK Python** (richiede `tratto-email` 2.2.0 o successiva)
+```python
+with open('fattura.pdf', 'rb') as f:
+    file = client.attachments.upload(
+        f, filename='fattura.pdf', content_type='application/pdf'
+    )
+print(f"Id allegato: {file['id']}")
+```
+
+Il contenuto può essere `bytes` o un file aperto in modalità binaria.
+
+**SDK PHP** (richiede `tratto/email` 1.2.0 o successiva)
+```php
+$file = $tratto->attachments->upload(file_get_contents('fattura.pdf'), 'fattura.pdf', 'application/pdf');
+echo 'Id allegato: ' . $file['id'];
+```
+
+Il contenuto può essere una stringa di byte o uno stream leggibile, come
+`fopen('fattura.pdf', 'rb')`.
 
 **Risposta (`201 Created`):**
 ```json
