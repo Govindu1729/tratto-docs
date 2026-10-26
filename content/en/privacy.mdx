@@ -29,7 +29,7 @@ Italy's Data Protection Authority (Garante Privacy), Order No. 284 of 17 April 2
 2. **Free, specific consent**: general newsletter sign-up consent isn't enough, tracking needs its own consent.
 3. **Granular revocation**: recipients must be able to withdraw tracking consent easily, without being forced to unsubscribe from everything.
 
-**What Tratto does technically**: the open pixel (a transparent 1×1 GIF) and click tracking only fire for emails tied to a known contact (campaigns, flows), never for pure transactional sends like a password reset, where there's no engagement purpose to justify it. The open event never carries the recipient's address, only an internal identifier resolved server-side.
+**What Tratto does technically**: the open pixel (a transparent 1×1 GIF) and click tracking only fire for emails tied to a known contact (campaigns, flows), never for pure transactional sends like a password reset, where there's no engagement purpose to justify it. The open event never carries the recipient's address, only an internal identifier resolved server-side. Opens and clicks are recorded only within 30 days of sending: after that, a tracked link still takes the recipient to its destination, but the click is not recorded.
 
 <Callout type="warning">
 The notice and specific consent toward your own recipients are your responsibility, not Tratto's: you're the controller for your campaigns (see below). Tratto today offers a single opt-out mechanism, full list unsubscribe, not a separate "keep emailing me but stop tracking me" toggle. If that's a blocker for your compliance workflow, write to **privacy@tratto.email**.
