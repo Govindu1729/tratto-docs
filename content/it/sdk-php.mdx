@@ -156,6 +156,29 @@ non partita non ha `id` ma un `error` con `code` e `message`. Dopo un 503 o un
 500 non è partito niente: ripeti lo stesso batch con la stessa chiave. Quota,
 limiti ed errori sono in [Invio in Batch](/it/docs/send-batch).
 
+## Allegati
+
+Richiede la **`tratto/email` 1.2.0 o successiva** e un piano a pagamento: il piano Free
+risponde `403 PLAN_UPGRADE_REQUIRED`. Prima carica il file, poi indicane l'id
+in `emails->send()` o `emails->sendBatch()`.
+
+```php
+$file = $tratto->attachments->upload(file_get_contents('fattura.pdf'), 'fattura.pdf', 'application/pdf');
+
+$tratto->emails->send([
+    'from' => 'billing@yourdomain.com',
+    'to' => ['alice@example.com'],
+    'subject' => 'La tua fattura',
+    'html' => '<p>In allegato.</p>',
+    'attachments' => [['id' => $file['id']]],
+]);
+
+$meta = $tratto->attachments->get($file['id']); // solo i metadati, mai i byte
+$tratto->attachments->delete($file['id']);
+```
+
+Il contenuto può essere una stringa di byte o uno stream leggibile. Limiti, scadenza e spazio sono in [Allegati](/it/docs/attachments).
+
 ## Stato e Timeline di un'Email
 
 ```php
@@ -180,11 +203,11 @@ if ($page['pagination']['hasMore']) {
 
 ## Altre Risorse
 
-Il client espone dieci risorse: `emails`, `contacts`, `audiences`,
-`campaigns`, `templates`, `webhooks`, `domains`, `analytics`, `flows` e
-`workspace`. Il
-[README](https://github.com/tratto-email/tratto-php/blob/v1.1.0/README.md#resources) mostra ogni
-metodo, e [`examples/`](https://github.com/tratto-email/tratto-php/tree/v1.1.0/examples)
+Il client espone undici risorse: `emails`, `contacts`, `audiences`,
+`campaigns`, `templates`, `attachments`, `webhooks`, `domains`, `analytics`,
+`flows` e `workspace` (`attachments` richiede la 1.2.0 o successiva). Il
+[README](https://github.com/tratto-email/tratto-php/blob/v1.2.0/README.md#resources) mostra ogni
+metodo, e [`examples/`](https://github.com/tratto-email/tratto-php/tree/v1.2.0/examples)
 ha un file eseguibile per risorsa più le integrazioni Laravel e Symfony.
 
 I [flow](/it/docs/flows) richiedono una API key con il permesso `*`: non

@@ -146,6 +146,34 @@ email has no `id`. Send only those again, in a new batch with a **new** key.
 After a 503 or a 500 nothing was sent: repeat the same call with the **same**
 key. Quota, limits and errors are in [Send a Batch](/en/docs/send-batch).
 
+## Attachments
+
+Requires **`@tratto/email` 1.7.0 or newer**, and a paid plan: the Free plan answers
+`403 PLAN_UPGRADE_REQUIRED`. Upload the file first, then reference its id
+from `emails.send()` or `emails.sendBatch()`.
+
+```typescript
+import { readFile } from 'node:fs/promises';
+
+const file = await tratto.attachments.upload(await readFile('invoice.pdf'), {
+  filename: 'invoice.pdf',
+  contentType: 'application/pdf',
+});
+
+await tratto.emails.send({
+  from: 'billing@yourdomain.com',
+  to: 'alice@example.com',
+  subject: 'Your invoice',
+  html: '<p>Attached.</p>',
+  attachments: [{ id: file.id }],
+});
+
+const meta = await tratto.attachments.get(file.id); // metadata only, never the bytes
+await tratto.attachments.delete(file.id);
+```
+
+The content can be a `Buffer`, `Uint8Array`, `ArrayBuffer` or `Blob`. Limits, expiry and storage are in [Attachments](/en/docs/attachments).
+
 ## Get Email Status
 
 ```typescript

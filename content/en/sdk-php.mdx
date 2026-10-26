@@ -153,6 +153,29 @@ Results are in the order of the request, and a failed email has no `id` but an
 retry the same batch with the same key. Quota, limits and errors are in
 [Send a Batch](/en/docs/send-batch).
 
+## Attachments
+
+Requires **`tratto/email` 1.2.0 or newer**, and a paid plan: the Free plan answers
+`403 PLAN_UPGRADE_REQUIRED`. Upload the file first, then reference its id
+from `emails->send()` or `emails->sendBatch()`.
+
+```php
+$file = $tratto->attachments->upload(file_get_contents('invoice.pdf'), 'invoice.pdf', 'application/pdf');
+
+$tratto->emails->send([
+    'from' => 'billing@yourdomain.com',
+    'to' => ['alice@example.com'],
+    'subject' => 'Your invoice',
+    'html' => '<p>Attached.</p>',
+    'attachments' => [['id' => $file['id']]],
+]);
+
+$meta = $tratto->attachments->get($file['id']); // metadata only, never the bytes
+$tratto->attachments->delete($file['id']);
+```
+
+The content can be a string of bytes or a readable stream. Limits, expiry and storage are in [Attachments](/en/docs/attachments).
+
 ## Get Email Status and Timeline
 
 ```php
@@ -177,11 +200,11 @@ if ($page['pagination']['hasMore']) {
 
 ## Other Resources
 
-The client exposes ten resources: `emails`, `contacts`, `audiences`,
-`campaigns`, `templates`, `webhooks`, `domains`, `analytics`, `flows` and
-`workspace`. The
-[README](https://github.com/tratto-email/tratto-php/blob/v1.1.0/README.md#resources) shows every
-method, and [`examples/`](https://github.com/tratto-email/tratto-php/tree/v1.1.0/examples)
+The client exposes eleven resources: `emails`, `contacts`, `audiences`,
+`campaigns`, `templates`, `attachments`, `webhooks`, `domains`, `analytics`,
+`flows` and `workspace` (`attachments` requires 1.2.0 or newer). The
+[README](https://github.com/tratto-email/tratto-php/blob/v1.2.0/README.md#resources) shows every
+method, and [`examples/`](https://github.com/tratto-email/tratto-php/tree/v1.2.0/examples)
 has one runnable file per resource plus Laravel and Symfony integrations.
 
 [Flows](/en/docs/flows) need an API key with the `*` permission: there are no

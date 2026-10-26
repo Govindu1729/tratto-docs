@@ -94,7 +94,42 @@ attachment = response.json()['data']
 print(f"Attachment id: {attachment['id']}")
 ```
 
-The SDKs have no upload method: upload over HTTP as shown above.
+With an SDK, `attachments.upload` sets both headers for you, non-ASCII
+filenames included, and returns the `data` object of the response.
+`attachments.get` and `attachments.delete` cover the other two endpoints.
+
+**Node.js SDK** (requires `@tratto/email` 1.7.0 or later)
+```typescript
+import { readFile } from 'node:fs/promises';
+
+const file = await tratto.attachments.upload(await readFile('invoice.pdf'), {
+  filename: 'invoice.pdf',
+  contentType: 'application/pdf',
+});
+console.log('Attachment id:', file.id);
+```
+
+The content can be a `Buffer`, `Uint8Array`, `ArrayBuffer` or `Blob`.
+
+**Python SDK** (requires `tratto-email` 2.2.0 or later)
+```python
+with open('invoice.pdf', 'rb') as f:
+    file = client.attachments.upload(
+        f, filename='invoice.pdf', content_type='application/pdf'
+    )
+print(f"Attachment id: {file['id']}")
+```
+
+The content can be `bytes` or a binary file object.
+
+**PHP SDK** (requires `tratto/email` 1.2.0 or later)
+```php
+$file = $tratto->attachments->upload(file_get_contents('invoice.pdf'), 'invoice.pdf', 'application/pdf');
+echo 'Attachment id: ' . $file['id'];
+```
+
+The content can be a string of bytes or a readable stream, such as
+`fopen('invoice.pdf', 'rb')`.
 
 **Response (`201 Created`):**
 ```json

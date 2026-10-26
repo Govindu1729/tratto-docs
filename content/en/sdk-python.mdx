@@ -125,6 +125,32 @@ a **new** key. After a `503` or `500` `TrattoError` nothing was sent, and
 retrying with the **same** key is safe. Quota, limits and errors are in
 [Send a Batch](/en/docs/send-batch).
 
+## Attachments
+
+Requires **`tratto-email` 2.2.0 or newer**, and a paid plan: the Free plan answers
+`403 PLAN_UPGRADE_REQUIRED`. Upload the file first, then reference its id
+from `emails.send()` or `emails.send_batch()`.
+
+```python
+with open('invoice.pdf', 'rb') as f:
+    file = client.attachments.upload(
+        f, filename='invoice.pdf', content_type='application/pdf'
+    )
+
+client.emails.send(SendEmailOptions(
+    from_='billing@yourdomain.com',
+    to='alice@example.com',
+    subject='Your invoice',
+    html='<p>Attached.</p>',
+    attachments=[{'id': file['id']}],
+))
+
+meta = client.attachments.get(file['id'])  # metadata only, never the bytes
+client.attachments.delete(file['id'])
+```
+
+The content can be `bytes` or a binary file object. Limits, expiry and storage are in [Attachments](/en/docs/attachments).
+
 ## Get Email Status
 
 ```python
