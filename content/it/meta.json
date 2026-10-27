@@ -33,6 +33,7 @@
     "audiences",
     "contacts",
     "flows",
+    "recipe-tag-from-events",
     "analytics",
     "---SDK & Integrazioni---",
     "sdk-nodejs",
