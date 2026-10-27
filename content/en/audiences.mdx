@@ -135,6 +135,121 @@ curl https://api.tratto.email/v1/audiences/aud_abc123 \
 }
 ```
 
+## Update an Audience
+
+Change the name, the description or the rules. Every field is optional; an
+omitted field keeps its value. Requires `contacts:write`.
+
+**cURL**
+```bash
+curl -X PATCH https://api.tratto.email/v1/audiences/aud_abc123 \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name":"VIP Subscribers",
+    "rules":[
+      {"field":"status","operator":"equals","value":"subscribed"},
+      {"field":"tags","operator":"array_contains","value":"vip"}
+    ]
+  }'
+```
+
+The response is the updated audience, same shape as
+[Get Audience Details](#get-audience-details). `name` is 1 to 100 characters,
+`description` up to 500.
+
+Sending a non-empty `rules` list recomputes membership against every contact
+before the response returns, so `contactCount` is already the new one.
+**Membership then follows the rules only**: a contact you
+[added by hand](#add-contacts-manually) that does not match them is removed.
+Sending `"rules": []` turns the audience static: the rules are cleared and the
+current members stay, nothing is recomputed.
+
+An unknown id answers `404`.
+
+## Refresh a Rule-Based Audience
+
+Recompute a dynamic audience against your contacts as they are now, and get
+the resulting count. Requires `contacts:write`.
+
+**cURL**
+```bash
+curl -X POST https://api.tratto.email/v1/audiences/aud_abc123/refresh \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+**Response:**
+```json
+{
+  "data": {
+    "contactCount": 1250
+  }
+}
+```
+
+Like a rules change, a refresh adds every contact that matches and removes
+every member that does not, contacts added by hand included. On a static
+audience (no `rules`) there is nothing to recompute and the call answers
+`422 VALIDATION_ERROR`. An unknown id answers `404`.
+
+## List Audience Members
+
+Read the contacts in an audience, newest contact first. Requires
+`contacts:read`.
+
+**cURL**
+```bash
+curl "https://api.tratto.email/v1/audiences/aud_abc123/contacts?limit=50" \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+**Query parameters:**
+- `limit`: Results per page, 1 to 100 (default 50)
+- `after`: The `nextCursor` of the previous page
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "id": "cont_abc123",
+      "email": "alice@example.com",
+      "firstName": "Alice",
+      "lastName": "Rossi",
+      "status": "subscribed"
+    }
+  ],
+  "pagination": {
+    "hasMore": true,
+    "nextCursor": "cont_abc123"
+  }
+}
+```
+
+Keep passing `nextCursor` as `after` until `hasMore` is `false`, where
+`nextCursor` is `null`. A cursor that does not match an existing contact is
+ignored and the list starts again from the first page. An unknown audience id
+answers `404`.
+
+## Remove a Contact from an Audience
+
+Take one contact out of an audience. The contact itself is not changed in any
+other way. Requires `contacts:write`.
+
+**cURL**
+```bash
+curl -X DELETE https://api.tratto.email/v1/audiences/aud_abc123/contacts/cont_abc123 \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+Returns `204 No Content`, also when the contact was not a member: removing it
+twice is safe. An unknown contact id answers `404`.
+
+On a dynamic audience the removal lasts only until membership is recomputed:
+the next [refresh](#refresh-a-rule-based-audience) or rules change adds the
+contact back if it still matches. To keep a contact out for good, change
+something the rules look at, such as a tag.
+
 ## Delete an Audience
 
 Permanently deletes the audience itself. **Contacts are never touched**:

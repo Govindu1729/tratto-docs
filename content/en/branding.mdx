@@ -1,7 +1,7 @@
 ---
 title: Email Footer & Branding
-description: When Tratto appends a footer to your emails — the "Sent using Tratto" badge, mandatory on some plans (today Free) and opt-in on the others.
-updatedAt: 2026-10-24
+description: When Tratto appends a footer to your emails (the "Sent using Tratto" badge, mandatory on some plans and opt-in on the others) and how to set your brand colours and logo through the API.
+updatedAt: 2026-10-27
 ---
 
 Tratto can append a small footer to the HTML version of the emails you send. There are two variants:
@@ -63,6 +63,123 @@ Good to know:
 | Other plans | `false` / not set (default) | Plain unsubscribe | No footer | No footer |
 
 Independently of the footer, every email sent through Tratto carries RFC 8058 one-click unsubscribe headers — see [Privacy & Compliance](/en/docs/privacy).
+
+## Brand colours and logo
+
+The workspace brand (a theme, three colours and a logo) is applied when
+[Markdown templates](/en/docs/emailmd-templates) render; that page explains
+where each colour lands in the email. This section is the API for setting it.
+You can also set it in **Settings → Workspace** in the dashboard.
+
+Every route below requires `workspace:write`. With a dashboard session, only
+the workspace owner can use them. `GET /v1/workspace` returns the current
+values in its `brand` object.
+
+### Theme and colours
+
+Send a `brand` object to `PATCH /v1/workspace`:
+
+```bash
+curl -X PATCH https://api.tratto.email/v1/workspace \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"brand": {"theme": "light", "primaryColor": "#C8382A", "accentColor": null}}'
+```
+
+| Field | Value | Used for |
+|-------|-------|----------|
+| `theme` | `light`, `dark` or `auto` | The default palette. `auto` follows the reader's light or dark setting. A template that sets its own `theme` still wins |
+| `primaryColor` | `#RRGGBB` | Links and the background of primary buttons |
+| `secondaryColor` | `#RRGGBB` | Border and label of secondary buttons |
+| `accentColor` | `#RRGGBB` | Dividers and horizontal rules |
+
+The update is partial: a key you leave out keeps its stored value, a key set to
+`null` is cleared. Colours must be six hex digits, such as `#C8382A`: a
+three-digit `#C83` or a name like `red` answers `422 VALIDATION_ERROR`.
+
+The response is the whole workspace, with the updated `brand`. Its
+`contrastWarnings` array flags colours that may be hard to read
+(`primary_low_contrast`, `secondary_low_contrast`, `button_label_low_contrast`,
+each with its contrast `ratio`). They are advice only: the colour is saved and
+applied anyway.
+
+**The logo cannot be set here.** `logoUrl`, `logoWidth` and `logoHeight` are
+owned by the server. If you send them inside `brand` they are silently dropped
+and the stored logo does not change. This is what stops anyone from pointing
+the emails Tratto sends at an image hosted somewhere else: the only way to set
+a logo is to upload the file.
+
+### Upload the logo
+
+`PUT /v1/workspace/brand/logo` takes the image file itself as the request
+body, not JSON and not a form:
+
+```bash
+curl -X PUT https://api.tratto.email/v1/workspace/brand/logo \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: image/png" \
+  --data-binary @logo.png
+```
+
+| Rule | If broken |
+|------|-----------|
+| `Content-Type` is `image/png` or `image/jpeg` | `415 UNSUPPORTED_MEDIA_TYPE`, before the file is read. This is the answer for `image/svg+xml`, `image/webp` and `image/gif` |
+| The file really is a PNG or a JPEG. The format is read from the file's bytes, not from the header | `422 VALIDATION_ERROR` |
+| At most 150 KB (153,600 bytes) | `413 PAYLOAD_TOO_LARGE` |
+| At most 600 px on the long side | `422 VALIDATION_ERROR` |
+| Still at least 8 px on both sides once fitted into the email | `422 VALIDATION_ERROR` |
+
+SVG, WebP and GIF are refused because Gmail and Outlook strip them or render
+them badly. The email fits the logo inside a 160 × 64 px box, keeping its
+proportions and never enlarging it; a very elongated image can end up a
+sliver, which is the last rule above.
+
+**Response:**
+```json
+{
+  "data": {
+    "theme": null,
+    "primaryColor": null,
+    "secondaryColor": null,
+    "accentColor": null,
+    "logoUrl": "https://assets.tratto.email/l/<sha256>.png",
+    "logoWidth": 320,
+    "logoHeight": 128,
+    "logoBytes": 24576,
+    "logoDisplayWidth": 160,
+    "logoDisplayHeight": 64,
+    "logoWarnings": [],
+    "contrastWarnings": []
+  }
+}
+```
+
+`logoDisplayWidth` and `logoDisplayHeight` are the size the logo is drawn at in
+the email. `logoWarnings` is advice, never a refusal:
+
+| Code | When |
+|------|------|
+| `logo_low_resolution` | The image is narrower than twice its display width, so it looks soft on high-density screens |
+| `logo_too_small` | It is drawn less than 24 px tall |
+| `logo_heavy` | The file is over 60 KB (61,440 bytes); every recipient downloads it on every open |
+
+Each warning carries `actual` and `recommended`: pixels for the two size codes,
+bytes for `logo_heavy`.
+
+The stored file is named after its content and never changes. Uploading a new
+logo gives a new `logoUrl`, and the old one keeps working, so emails already
+delivered keep showing the logo they were sent with.
+
+### Remove the logo
+
+```bash
+curl -X DELETE https://api.tratto.email/v1/workspace/brand/logo \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+Returns `200` with the `brand` object, logo fields set to `null`. Emails sent
+from then on have no logo. The stored file is not deleted, because emails
+already delivered still point to it.
 
 ## Next Steps
 

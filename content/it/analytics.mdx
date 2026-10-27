@@ -119,6 +119,33 @@ curl "https://api.tratto.email/v1/campaigns/camp_abc123/links?limit=20" \
 
 `limit` è opzionale, 1-50, default 20.
 
+## Dati Live e di Test
+
+Le analytics seguono l'ambiente della chiave che le chiede. Una chiave
+`tratto_live_...` legge solo gli invii live, una chiave `tratto_test_...` solo
+quelli di [test](/it/docs/test-mode).
+
+Entrambi gli endpoint accettano anche un parametro di query `livemode` (`true`
+o `false`). È l'interruttore di vista della dashboard e **per le chiavi API
+viene ignorato**: vince sempre l'ambiente della chiave, quindi una chiave live
+non legge i numeri di test e una chiave di test non legge quelli live,
+qualunque valore passi.
+
+La vista di test è limitata a `7d`, `30d` e `90d`. I periodi più lunghi leggono
+un aggregato che contiene solo dati live, quindi una chiave di test che chiede
+`180d` o `1y` riceve `422 VALIDATION_ERROR` invece di una serie di zeri:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Analytics for the test environment are not available for the '180d' period.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes",
+    "suggestion": "Periods longer than 90 days read the long-term aggregate, which contains live data only. Use period=90d or shorter for the test view."
+  }
+}
+```
+
 ## Finestre Dati: Firestore vs BigQuery
 
 - **`7d`/`30d`/`90d`** sono servite da Firestore in tempo reale — nessun ritardo di aggregazione, ma Firestore conserva i documenti email solo per 90 giorni.

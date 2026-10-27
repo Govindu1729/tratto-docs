@@ -119,6 +119,32 @@ curl "https://api.tratto.email/v1/campaigns/camp_abc123/links?limit=20" \
 
 `limit` is optional, 1-50, defaults to 20.
 
+## Live and Test Data
+
+Analytics follow the environment of the key that asks. A `tratto_live_...` key
+reads live sends only, a `tratto_test_...` key reads [test](/en/docs/test-mode)
+sends only.
+
+Both endpoints also accept a `livemode` query parameter (`true` or `false`).
+It is the view switch of the dashboard and **is ignored for API keys**: the
+key's own environment always wins, so a live key cannot read test numbers and
+a test key cannot read live ones, whatever you pass.
+
+The test view is limited to `7d`, `30d` and `90d`. The longer periods read an
+aggregate that contains live data only, so a test key asking for `180d` or
+`1y` gets `422 VALIDATION_ERROR` instead of zeros:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Analytics for the test environment are not available for the '180d' period.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes",
+    "suggestion": "Periods longer than 90 days read the long-term aggregate, which contains live data only. Use period=90d or shorter for the test view."
+  }
+}
+```
+
 ## Data Windows: Firestore vs BigQuery
 
 - **`7d`/`30d`/`90d`** are served from Firestore in real time — no aggregation delay, but Firestore only retains email documents for 90 days.

@@ -1,7 +1,7 @@
 ---
 title: "Template: Crea, Versiona e Test"
 description: Gestisci template email versionati con sostituzione di variabili
-updatedAt: 2026-10-24
+updatedAt: 2026-10-27
 ---
 
 I **template** sono template email riutilizzabili con variabili placeholder. Invece di comporre HTML nel codice ogni volta, definisci un template una volta e invialo centinaia di volte con variabili diverse.
@@ -336,13 +336,66 @@ risponde `503`, perché il tetto si conta prima della consegna alla coda.
 
 ## Elenca i Template
 
-Ottieni tutti i template per il tuo tenant.
+Elenca i template del workspace, dal più recente, una pagina alla volta.
+Richiede `templates:read`.
 
 **cURL**
 ```bash
-curl https://api.tratto.email/v1/templates \
+curl "https://api.tratto.email/v1/templates?status=published&limit=50" \
   -H "Authorization: Bearer tratto_live_..."
 ```
+
+**Parametri di query:**
+
+| Parametro | Default | A cosa serve |
+|-----------|---------|--------------|
+| `limit` | `50` | Risultati per pagina, da 1 a 100 |
+| `after` | nessuno | Il `nextCursor` della pagina precedente |
+| `status` | nessuno | `draft` o `published`. Qualsiasi altro valore risponde `422` |
+| `include` | nessuno | `html` aggiunge a ogni riga l'`html` del template. È l'unico valore accettato |
+
+**Risposta:**
+```json
+{
+  "data": [
+    {
+      "id": "tmpl_abc123",
+      "name": "Benvenuto",
+      "status": "published",
+      "format": "html",
+      "version": 2,
+      "createdAt": "2025-06-30T12:00:00Z",
+      "updatedAt": "2025-07-02T09:30:00Z"
+    }
+  ],
+  "pagination": {
+    "hasMore": true,
+    "nextCursor": "tmpl_abc123"
+  }
+}
+```
+
+Le righe non contengono `html` se non lo chiedi con `include=html`: è il campo
+più pesante di un template e a quasi tutti gli elenchi non serve. Per tutto il
+resto di un singolo template usa [Ottieni un Template](#ottieni-un-template).
+
+**L'elenco si ferma a una pagina.** Senza `after` ricevi i 50 template più
+recenti, e l'unico segnale che ce ne sono altri è `pagination.hasMore`. Per
+leggerli tutti passa `nextCursor` come `after` finché `hasMore` è `false`:
+
+```bash
+# Prima pagina
+curl "https://api.tratto.email/v1/templates?limit=100" \
+  -H "Authorization: Bearer tratto_live_..."
+
+# Pagina successiva: after = il nextCursor appena ricevuto
+curl "https://api.tratto.email/v1/templates?limit=100&after=tmpl_abc123" \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+Sull'ultima pagina `hasMore` è `false` e `nextCursor` è `null`. Un cursore che
+non corrisponde a un template esistente viene ignorato e l'elenco riparte dalla
+prima pagina. Tieni lo stesso `status` su tutte le pagine di una stessa lettura.
 
 ## Ottieni un Template
 

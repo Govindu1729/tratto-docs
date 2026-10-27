@@ -135,6 +135,121 @@ curl https://api.tratto.email/v1/audiences/aud_abc123 \
 }
 ```
 
+## Modifica un'Audience
+
+Cambia il nome, la descrizione o le regole. Tutti i campi sono facoltativi: un
+campo omesso mantiene il suo valore. Richiede `contacts:write`.
+
+**cURL**
+```bash
+curl -X PATCH https://api.tratto.email/v1/audiences/aud_abc123 \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name":"Iscritti VIP",
+    "rules":[
+      {"field":"status","operator":"equals","value":"subscribed"},
+      {"field":"tags","operator":"array_contains","value":"vip"}
+    ]
+  }'
+```
+
+La risposta è l'audience aggiornata, con la stessa forma di
+[Ottieni Dettagli dell'Audience](#ottieni-dettagli-dellaudience). `name` va da
+1 a 100 caratteri, `description` fino a 500.
+
+Se mandi una lista `rules` non vuota, l'appartenenza viene ricalcolata su tutti
+i contatti prima della risposta, quindi `contactCount` è già quello nuovo.
+**Da lì in poi conta solo la regola**: un contatto che avevi
+[aggiunto a mano](#aggiungi-contatti-manualmente) e che non la soddisfa viene
+tolto. Con `"rules": []` l'audience diventa statica: le regole si azzerano, i
+membri attuali restano e non si ricalcola niente.
+
+Un id inesistente risponde `404`.
+
+## Ricalcola un'Audience Dinamica
+
+Ricalcola un'audience dinamica sui contatti come sono adesso e restituisce il
+conteggio risultante. Richiede `contacts:write`.
+
+**cURL**
+```bash
+curl -X POST https://api.tratto.email/v1/audiences/aud_abc123/refresh \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+**Risposta:**
+```json
+{
+  "data": {
+    "contactCount": 1250
+  }
+}
+```
+
+Come un cambio di regole, il ricalcolo aggiunge ogni contatto che soddisfa le
+regole e toglie ogni membro che non le soddisfa, compresi quelli aggiunti a
+mano. Su un'audience statica (senza `rules`) non c'è niente da ricalcolare e la
+chiamata risponde `422 VALIDATION_ERROR`. Un id inesistente risponde `404`.
+
+## Elenca i Membri di un'Audience
+
+Legge i contatti di un'audience, dal contatto più recente. Richiede
+`contacts:read`.
+
+**cURL**
+```bash
+curl "https://api.tratto.email/v1/audiences/aud_abc123/contacts?limit=50" \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+**Parametri di query:**
+- `limit`: risultati per pagina, da 1 a 100 (default 50)
+- `after`: il `nextCursor` della pagina precedente
+
+**Risposta:**
+```json
+{
+  "data": [
+    {
+      "id": "cont_abc123",
+      "email": "alice@example.com",
+      "firstName": "Alice",
+      "lastName": "Rossi",
+      "status": "subscribed"
+    }
+  ],
+  "pagination": {
+    "hasMore": true,
+    "nextCursor": "cont_abc123"
+  }
+}
+```
+
+Continua a passare `nextCursor` come `after` finché `hasMore` è `false`; a quel
+punto `nextCursor` è `null`. Un cursore che non corrisponde a un contatto
+esistente viene ignorato e l'elenco riparte dalla prima pagina. Un id di
+audience inesistente risponde `404`.
+
+## Togli un Contatto da un'Audience
+
+Toglie un contatto da un'audience. Il contatto in sé non cambia in nessun altro
+modo. Richiede `contacts:write`.
+
+**cURL**
+```bash
+curl -X DELETE https://api.tratto.email/v1/audiences/aud_abc123/contacts/cont_abc123 \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+Restituisce `204 No Content`, anche quando il contatto non era membro: ripetere
+la chiamata non fa danni. Un id di contatto inesistente risponde `404`.
+
+Su un'audience dinamica la rimozione non è definitiva: il
+prossimo [ricalcolo](#ricalcola-unaudience-dinamica) o cambio di regole rimette
+dentro il contatto se le soddisfa ancora. Per tenerlo fuori davvero, cambia
+qualcosa che le regole guardano, per esempio un tag.
+
 ## Elimina un'Audience
 
 Elimina definitivamente l'audience stessa. **I contatti non vengono mai
