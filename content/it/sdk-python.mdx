@@ -1,10 +1,15 @@
 ---
 title: Python SDK
 description: SDK ufficiale Python per Tratto Email API
+updatedAt: 2026-10-27
 ---
 
 SDK ufficiale per Python: **`tratto-email`**. Nessuna dipendenza esterna,
 costruito su `urllib`. Richiede Python 3.10+.
+
+Ogni esempio di questa pagina passa il controllo di mypy contro la **2.3.0**
+pubblicata. Dove una funzionalità richiede una versione precisa, la pagina
+dichiara la minima che ce l'ha.
 
 ## Installazione
 
@@ -19,6 +24,23 @@ from tratto import Tratto
 
 client = Tratto('tratto_live_...')
 ```
+
+`timeout` fissa quanto può aspettare ogni richiesta, in **secondi**, sia per la
+connessione sia per ogni lettura. Richiede la **2.3.0 o successiva** e vale
+`60` se non lo indichi. Una richiesta che ci mette di più solleva
+`TrattoError` con `code == 'timeout'` e `status_code == 0`:
+
+```python
+client = Tratto('tratto_live_...', timeout=10)
+```
+
+Un invio andato in timeout può essere arrivato comunque all'API. Ritentalo con
+la stessa [chiave di idempotenza](/it/docs/idempotency), così non parte due
+volte.
+
+Dalla 2.3.0 l'SDK codifica (percent-encoding) ogni id che inserisce nel path
+dell'URL, quindi un id che contiene `/`, `?` o `#` non può cambiare la rotta
+chiamata.
 
 ## Invia Email
 
@@ -94,6 +116,19 @@ result = client.emails.send(SendEmailOptions(
     scheduled_at='2025-07-01T09:00:00Z',
 ))
 ```
+
+Finché l'email è ancora `scheduled` puoi spostarla a un'altra data o
+annullarla. Entrambi i metodi richiedono la **2.3.0 o successiva**:
+
+```python
+client.emails.reschedule('email_abc123', '2025-07-02T09:00:00Z')
+client.emails.cancel('email_abc123')  # la sua quota torna al mese
+```
+
+Quando l'email non è più `scheduled`, entrambi sollevano `TrattoError` con
+codice `CONFLICT` (409). Spostarla in un altro mese UTC può sollevare
+`QUOTA_EXCEEDED` (429) se quel mese è pieno, e un `RATE_LIMITED` (429) si può
+ritentare senza rischi.
 
 ## Invia un Batch
 
@@ -255,6 +290,54 @@ webhook = client.webhooks.create(CreateWebhookOptions(
 print(webhook['data']['secret'])  # whsec_xyz789... (restituito una sola volta)
 ```
 
+## Verifica i Webhook
+
+`verify_webhook` controlla l'header `X-Tratto-Signature` di una consegna e
+richiede la **2.3.0 o successiva**. Passagli il body grezzo esattamente come
+arriva, prima di qualunque parsing JSON. Con Flask:
+
+```python
+import json
+import os
+
+from flask import Flask, request
+from tratto import verify_webhook
+
+app = Flask(__name__)
+
+
+@app.post('/webhooks/tratto')
+def tratto_webhook():
+    raw_body = request.get_data()  # bytes, prima di qualunque parsing
+    if not verify_webhook(
+        raw_body,
+        request.headers.get('X-Tratto-Signature'),
+        os.environ['TRATTO_WEBHOOK_SECRET'],
+    ):
+        return {'error': 'Firma non valida'}, 401
+
+    event = json.loads(raw_body)
+    return {'ok': True}, 200
+```
+
+Restituisce `False` per un header mancante, malformato, scaduto o che non
+corrisponde, e solleva `ValueError` solo con un secret vuoto o una tolleranza
+negativa. La tolleranza è di 5 minuti in entrambe le direzioni; la cambi con
+`tolerance_seconds=600`. Come è costruita la firma è spiegato in
+[Verifica della firma dei webhook](/it/docs/webhook-verification).
+
+## Elenca i Flow
+
+```python
+flows = client.flows.list(limit=20)
+active = [f for f in flows['data'] if f['status'] == 'active']
+```
+
+L'argomento `status` di `flows.list` è deprecato dalla **2.3.0**: l'API lo
+ignora e restituisce i flow di ogni status, quindi passarlo ora emette un
+`DeprecationWarning`. Filtra invece sullo `status` di ogni flow (`draft`,
+`active` o `inactive`) nella risposta, come sopra.
+
 ## Gestione Errori
 
 ```python
@@ -272,6 +355,9 @@ except TrattoError as e:
         # Il messaggio indica quale dominio non è verificato.
         print(e)
 ```
+
+Un errore con `code == 'timeout'` e `status_code == 0` è il
+[timeout](#inizializzazione) del client, non una risposta dell'API.
 
 Oltre a `code` e `status_code`, `TrattoError` porta due campi che arrivano dalla
 risposta dell'API, entrambi dalla **1.2.0 o successiva**: `suggestion`, cioè

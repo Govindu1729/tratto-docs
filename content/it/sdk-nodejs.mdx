@@ -6,7 +6,7 @@ updatedAt: 2026-10-27
 
 SDK ufficiale per Node.js e TypeScript: **`@tratto/email`**
 
-Ogni esempio di questa pagina compila contro la **1.7.0** pubblicata. Dove una
+Ogni esempio di questa pagina compila contro la **1.8.0** pubblicata. Dove una
 funzionalità richiede una versione precisa, la pagina dichiara la minima che ce
 l'ha, mai la più recente: quella invecchia da sola.
 
@@ -34,6 +34,23 @@ const tratto = new Tratto(process.env.TRATTO_API_KEY!, {
   baseUrl: 'https://api.tratto.email',
 });
 ```
+
+`timeout` fissa quanto può durare ogni richiesta, in **millisecondi**, e
+richiede la **1.8.0 o successiva**. Il valore predefinito è `60000` (60
+secondi). Una richiesta che dura di più lancia `TrattoError` con
+`code: 'timeout'` e `statusCode: 0`:
+
+```typescript
+const tratto = new Tratto(process.env.TRATTO_API_KEY!, { timeout: 10_000 });
+```
+
+Un invio andato in timeout può essere arrivato comunque all'API. Ritentalo con
+la stessa [chiave di idempotenza](/it/docs/idempotency), così non parte due
+volte.
+
+Dalla 1.8.0 l'SDK codifica (percent-encoding) ogni id che inserisce nel path
+dell'URL, quindi un id che contiene `/`, `?` o `#` non può cambiare la rotta
+chiamata.
 
 ## Invia Email
 
@@ -114,9 +131,17 @@ const { id } = await tratto.emails.send({
 });
 ```
 
-Annullare o riprogrammare un'email programmata si fa via
-[HTTP](/it/docs/sdk-http): non esiste ancora un metodo SDK — vedi
-[Cosa l'SDK non copre](#cosa-lsdk-non-copre-ancora).
+Finché l'email è ancora `scheduled` puoi annullarla o spostarla a un'altra
+data. Entrambi i metodi richiedono la **1.8.0 o successiva**:
+
+```typescript
+await tratto.emails.reschedule('email_abc123', new Date('2026-10-02T09:00:00Z'));
+await tratto.emails.cancel('email_abc123'); // la sua quota torna al mese
+```
+
+Quando l'email non è più `scheduled`, entrambi rispondono `409 CONFLICT`.
+Spostarla in un altro mese UTC può rispondere `429 QUOTA_EXCEEDED` se quel mese
+è pieno, e un `429 RATE_LIMITED` si può ritentare senza rischi.
 
 ## Invia un Batch
 
@@ -253,7 +278,7 @@ console.log(campaign.status); // 'draft'
 ```
 
 <Callout type="info">
-L'API è più permissiva dei tipi della 1.7.0: accetta `html` inline al posto di
+L'API è più permissiva dei tipi della 1.8.0: accetta `html` inline al posto di
 un `templateId`, e interpreta un `audienceId` omesso come «tutti i contatti del
 workspace». Nessuna delle due cose è esprimibile con l'SDK: per quelle usa
 [HTTP](/it/docs/sdk-http).
@@ -292,8 +317,14 @@ perché una parte della lista può già avere l'email. Mettila in pausa invece.
 
 `Campaign.pausedReason` dice perché una campagna si è fermata da sola, e
 richiede a sua volta la **1.2.0 o successiva**. Vale `'quota_exceeded' |
-'schedule_missed' | 'bounce_rate' | null`, e `'bounce_rate'` è lo
-[stop automatico sui rimbalzi](/it/docs/campaigns#tasso-di-rimbalzi):
+'schedule_missed' | 'bounce_rate' | 'quota_unavailable' | null`.
+`'bounce_rate'` è lo
+[stop automatico sui rimbalzi](/it/docs/campaigns#tasso-di-rimbalzi).
+`'quota_unavailable'` vuol dire che non è stato possibile leggere la quota
+mensile per un errore nostro, non che sia esaurita, quindi la campagna si può
+riprendere; il tipo lo include dalla **1.8.0 o successiva**. Tutti e quattro
+sono spiegati in
+[Perché una campagna è in pausa](/it/docs/campaigns#motivo-della-pausa).
 
 ```typescript
 const campaign = await tratto.campaigns.get('camp_xyz789');
@@ -331,6 +362,40 @@ const webhook = await tratto.webhooks.create({
 console.log(webhook.secret); // whsec_xyz789...
 ```
 
+## Verifica i Webhook
+
+`verifyWebhook` controlla l'header `X-Tratto-Signature` di una consegna e
+richiede la **1.8.0 o successiva**. Passagli il body grezzo esattamente come
+arriva, prima di qualunque parsing JSON:
+
+```typescript
+import { verifyWebhook } from '@tratto/email';
+
+export async function POST(request: Request) {
+  const rawBody = await request.text(); // leggilo una volta, prima del parsing
+
+  const ok = verifyWebhook(
+    rawBody,
+    request.headers.get('x-tratto-signature'),
+    process.env.TRATTO_WEBHOOK_SECRET!,
+  );
+  if (!ok) return new Response('Firma non valida', { status: 401 });
+
+  const event = JSON.parse(rawBody);
+  console.log(event.type);
+  return Response.json({ ok: true });
+}
+```
+
+Il body può essere anche un `Buffer` o un `Uint8Array`, per esempio quello di
+`express.raw({ type: 'application/json' })`.
+
+Restituisce `false` per un header mancante, malformato, scaduto o che non
+corrisponde, e lancia un'eccezione solo con un secret vuoto o una tolleranza
+negativa. La tolleranza è di 5 minuti in entrambe le direzioni; la cambi con
+`{ toleranceSeconds: 600 }` come quarto argomento. Come è costruita la firma è
+spiegato in [Verifica della firma dei webhook](/it/docs/webhook-verification).
+
 ## Analytics
 
 `AnalyticsPeriod` è `'7d' | '30d' | '90d' | '180d' | '1y'` (gli ultimi due
@@ -344,9 +409,24 @@ console.log(summary.delivered);
 `180d` e `1y` leggono l'aggregato di lungo periodo, che contiene solo dati live:
 l'API li rifiuta per una chiave in modalità test.
 
+## Limiti del Workspace
+
+`workspace.get()` restituisce in `limits` i tetti del piano del workspace. Il
+tipo `Workspace.limits` (`WorkspaceLimits`) richiede la **1.8.0 o successiva**:
+
+```typescript
+const workspace = await tratto.workspace.get();
+const { emailsPerMonth, domains, webhooks } = workspace.limits;
+console.log(emailsPerMonth ?? 'nessun limite', domains ?? 'nessun limite', webhooks);
+```
+
+I sette campi sono `domains`, `emailsPerMonth`, `membersPerAccount`,
+`membersPerWorkspace`, `workspaces`, `webhooks` e `testSendsPerDay`.
+`domains` ed `emailsPerMonth` valgono `null` quando il piano non ha limite.
+
 ## Gestione degli Errori
 
-`TrattoError` espone `code`, `statusCode`, `docs` e `details`:
+`TrattoError` espone `code`, `statusCode`, `docs`, `details` e `suggestion`:
 
 ```typescript
 import { Tratto, TrattoError } from '@tratto/email';
@@ -375,15 +455,31 @@ esempio `[{ path: '/emails/3/to', message: '...' }]` per la quarta email di un
 batch. Richiede la **1.6.0 o successiva** e vale `undefined` quando l'API non
 lo invia.
 
+`suggestion` è il consiglio dell'API su cosa fare, per esempio aspettare e
+ritentare o correggere un'impostazione. Richiede la **1.8.0 o successiva** e
+vale `undefined` quando l'errore non ne porta uno. È il campo da leggere quando
+un codice copre più situazioni, come il `CONFLICT` di `campaigns.send`:
+
+```typescript
+try {
+  await tratto.campaigns.send('camp_xyz789');
+} catch (error) {
+  if (error instanceof TrattoError) {
+    console.error(error.code, error.suggestion ?? error.message);
+  }
+}
+```
+
+Un errore con `code: 'timeout'` e `statusCode: 0` è il
+[timeout](#inizializzazione) del client, non una risposta dell'API.
+
 ## Cosa l'SDK non copre ancora
 
-Questi endpoint esistono nell'API e **non hanno un metodo SDK** nella 1.7.0.
+Questi endpoint esistono nell'API e **non hanno un metodo SDK** nella 1.8.0.
 Chiamali via [HTTP](/it/docs/sdk-http) finché l'SDK non li recupera:
 
 | Funzionalità | HTTP |
 |---|---|
-| Annullare un'email programmata | `DELETE /v1/emails/{id}` |
-| Riprogrammare un'email | `PATCH /v1/emails/{id}` |
 | Leggere un singolo contatto | `GET /v1/contacts/{id}` |
 | Modificare / eliminare una campagna | `PATCH`, `DELETE /v1/campaigns/{id}` |
 | Click sui link di una campagna | `GET /v1/campaigns/{id}/links` |
@@ -393,15 +489,15 @@ Chiamali via [HTTP](/it/docs/sdk-http) finché l'SDK non li recupera:
 | Gestione delle chiavi API | `/v1/api-keys` |
 | Logo del marchio di workspace | `PUT`, `DELETE /v1/workspace/brand/logo` |
 
-Mancano dai tipi della 1.7.0 anche alcuni campi di risposta più recenti:
-`Workspace` non ha `limits` né `brand`, `Contact` non ha `trackingOptOut`,
+Mancano dai tipi della 1.8.0 anche alcuni campi di risposta più recenti:
+`Workspace` non ha `brand`, `Contact` non ha `trackingOptOut`,
 e `CampaignStats` non ha `skipped`,
 `untracked` né `variants`. L'API li restituisce; i tipi non li descrivono
-ancora. `TrattoError` espone `docs` ma non `suggestion`, che invece l'SDK
-Python ha.
+ancora.
 
-Verificato sulla `@tratto/email` 1.7.0 pubblicata, il 2026-10-27: le dieci righe
-sono ancora scoperte, e `ListContactsParams.q` è coperto dalla 1.4.0
+Verificato sulla `@tratto/email` 1.8.0 pubblicata, il 2026-10-27: le otto righe
+sono ancora scoperte, `emails.cancel` ed `emails.reschedule` sono coperti dalla
+1.8.0, e `ListContactsParams.q` è coperto dalla 1.4.0
 (`contacts.list({ q })`). Ogni riga di questa tabella è la
 promessa che la lacuna c'è ancora: va riletta a ogni rilascio dell'SDK.
 

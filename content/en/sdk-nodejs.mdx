@@ -6,7 +6,7 @@ updatedAt: 2026-10-27
 
 The official SDK for Node.js and TypeScript: **`@tratto/email`**
 
-Every example on this page typechecks against the published **1.7.0**. Where a feature needs
+Every example on this page typechecks against the published **1.8.0**. Where a feature needs
 a particular version, the page names the minimum one that has it; it never
 names the newest, because that goes stale on its own.
 
@@ -34,6 +34,21 @@ const tratto = new Tratto(process.env.TRATTO_API_KEY!, {
   baseUrl: 'https://api.tratto.email',
 });
 ```
+
+`timeout` sets how long each request may take, in **milliseconds**, and
+requires **1.8.0 or newer**. The default is `60000` (60 seconds). A request
+that runs longer throws `TrattoError` with `code: 'timeout'` and
+`statusCode: 0`:
+
+```typescript
+const tratto = new Tratto(process.env.TRATTO_API_KEY!, { timeout: 10_000 });
+```
+
+A send that timed out may still have reached the API. Retry it with the same
+[idempotency key](/en/docs/idempotency), so it cannot go out twice.
+
+From 1.8.0 the SDK percent-encodes every id it puts in a URL path, so an id
+containing `/`, `?` or `#` cannot change the route called.
 
 ## Send Email
 
@@ -113,9 +128,17 @@ const { id } = await tratto.emails.send({
 });
 ```
 
-Canceling or rescheduling a scheduled email is available over
-[HTTP](/en/docs/sdk-http) but has no SDK method yet — see
-[What the SDK does not cover](#what-the-sdk-does-not-cover-yet).
+While the email is still `scheduled` you can cancel it or move it to another
+date. Both methods require **1.8.0 or newer**:
+
+```typescript
+await tratto.emails.reschedule('email_abc123', new Date('2026-10-02T09:00:00Z'));
+await tratto.emails.cancel('email_abc123'); // its quota goes back to the month
+```
+
+Once the email has left `scheduled`, both answer `409 CONFLICT`. Moving it to
+another UTC month can answer `429 QUOTA_EXCEEDED` when that month is full, and
+`429 RATE_LIMITED` is safe to retry.
 
 ## Send a Batch
 
@@ -250,7 +273,7 @@ console.log(campaign.status); // 'draft'
 ```
 
 <Callout type="info">
-The API itself is more permissive than the 1.7.0 types: it accepts inline
+The API itself is more permissive than the 1.8.0 types: it accepts inline
 `html` instead of a `templateId`, and treats an omitted `audienceId` as "every
 contact in the workspace". Neither is expressible through the SDK yet. Use
 [HTTP](/en/docs/sdk-http) for those.
@@ -289,8 +312,12 @@ part of the list may already have the email. Pause it instead.
 
 `Campaign.pausedReason` says why a campaign stopped on its own, and also needs
 **1.2.0 or newer**. It reads `'quota_exceeded' | 'schedule_missed' |
-'bounce_rate' | null`, and `'bounce_rate'` is the
-[automatic bounce stop](/en/docs/campaigns#bounce-rate):
+'bounce_rate' | 'quota_unavailable' | null`. `'bounce_rate'` is the
+[automatic bounce stop](/en/docs/campaigns#bounce-rate). `'quota_unavailable'`
+means the monthly quota could not be read because of an error on our side, not
+that it is exhausted, so the campaign can be resumed; the type includes it
+from **1.8.0 or newer**. All four are explained in
+[Why a campaign is paused](/en/docs/campaigns#paused-reason).
 
 ```typescript
 const campaign = await tratto.campaigns.get('camp_xyz789');
@@ -328,6 +355,40 @@ const webhook = await tratto.webhooks.create({
 console.log(webhook.secret); // whsec_xyz789...
 ```
 
+## Verify Webhooks
+
+`verifyWebhook` checks the `X-Tratto-Signature` header of a delivery and
+requires **1.8.0 or newer**. Pass the raw body exactly as received, before any
+JSON parsing:
+
+```typescript
+import { verifyWebhook } from '@tratto/email';
+
+export async function POST(request: Request) {
+  const rawBody = await request.text(); // read once, before parsing
+
+  const ok = verifyWebhook(
+    rawBody,
+    request.headers.get('x-tratto-signature'),
+    process.env.TRATTO_WEBHOOK_SECRET!,
+  );
+  if (!ok) return new Response('Invalid signature', { status: 401 });
+
+  const event = JSON.parse(rawBody);
+  console.log(event.type);
+  return Response.json({ ok: true });
+}
+```
+
+The body can also be a `Buffer` or `Uint8Array`, for example from
+`express.raw({ type: 'application/json' })`.
+
+It returns `false` for a missing, malformed, stale or non-matching header, and
+throws only on an empty secret or a negative tolerance. The tolerance is 5
+minutes either way; change it with `{ toleranceSeconds: 600 }` as the fourth
+argument. How the signature is built is in
+[Webhook Signature Verification](/en/docs/webhook-verification).
+
 ## Analytics
 
 `AnalyticsPeriod` is `'7d' | '30d' | '90d' | '180d' | '1y'` (the last two
@@ -341,9 +402,24 @@ console.log(summary.delivered);
 `180d` and `1y` read the long-term aggregate, which only holds live data: the
 API rejects them for a test-mode key.
 
+## Workspace Limits
+
+`workspace.get()` returns the caps of the workspace plan in `limits`. The
+`Workspace.limits` type (`WorkspaceLimits`) requires **1.8.0 or newer**:
+
+```typescript
+const workspace = await tratto.workspace.get();
+const { emailsPerMonth, domains, webhooks } = workspace.limits;
+console.log(emailsPerMonth ?? 'no limit', domains ?? 'no limit', webhooks);
+```
+
+The seven fields are `domains`, `emailsPerMonth`, `membersPerAccount`,
+`membersPerWorkspace`, `workspaces`, `webhooks` and `testSendsPerDay`.
+`domains` and `emailsPerMonth` are `null` when the plan has no limit.
+
 ## Error Handling
 
-`TrattoError` carries `code`, `statusCode`, `docs` and `details`:
+`TrattoError` carries `code`, `statusCode`, `docs`, `details` and `suggestion`:
 
 ```typescript
 import { Tratto, TrattoError } from '@tratto/email';
@@ -371,15 +447,31 @@ On a 422 `VALIDATION_ERROR`, `details` says which field is wrong, for example
 `[{ path: '/emails/3/to', message: '...' }]` for the fourth email of a batch.
 It requires **1.6.0 or newer** and is `undefined` when the API sends none.
 
+`suggestion` is the API's own advice on what to do next, such as waiting and
+retrying or fixing a setting. It requires **1.8.0 or newer** and is
+`undefined` when the error carries none. It is the field to read where one
+code covers several situations, like the `CONFLICT` on `campaigns.send`:
+
+```typescript
+try {
+  await tratto.campaigns.send('camp_xyz789');
+} catch (error) {
+  if (error instanceof TrattoError) {
+    console.error(error.code, error.suggestion ?? error.message);
+  }
+}
+```
+
+An error with `code: 'timeout'` and `statusCode: 0` is the client
+[timeout](#initialization), not an API response.
+
 ## What the SDK does not cover yet
 
-These endpoints exist in the API and have **no SDK method** in 1.7.0. Call
+These endpoints exist in the API and have **no SDK method** in 1.8.0. Call
 them over [HTTP](/en/docs/sdk-http) until the SDK catches up:
 
 | Capability | HTTP |
 |---|---|
-| Cancel a scheduled email | `DELETE /v1/emails/{id}` |
-| Reschedule an email | `PATCH /v1/emails/{id}` |
 | Get one contact | `GET /v1/contacts/{id}` |
 | Update / delete a campaign | `PATCH`, `DELETE /v1/campaigns/{id}` |
 | Campaign link clicks | `GET /v1/campaigns/{id}/links` |
@@ -389,15 +481,15 @@ them over [HTTP](/en/docs/sdk-http) until the SDK catches up:
 | API key management | `/v1/api-keys` |
 | Workspace brand logo | `PUT`, `DELETE /v1/workspace/brand/logo` |
 
-Some newer response fields are likewise absent from the 1.7.0 types:
-`Workspace` has no `limits` or `brand`, `Contact` has no `trackingOptOut`,
+Some newer response fields are likewise absent from the 1.8.0 types:
+`Workspace` has no `brand`, `Contact` has no `trackingOptOut`,
 and `CampaignStats` has no `skipped`,
 `untracked` or `variants`. The API returns them; the types do not describe
-them yet. `TrattoError` carries `docs` but not `suggestion`, which the Python
-SDK does expose.
+them yet.
 
-Checked against the published `@tratto/email` 1.7.0 on 2026-10-27: the ten rows
-are still uncovered, and `ListContactsParams.q` is covered from 1.4.0
+Checked against the published `@tratto/email` 1.8.0 on 2026-10-27: the eight rows
+are still uncovered, `emails.cancel` and `emails.reschedule` are covered from
+1.8.0, and `ListContactsParams.q` is covered from 1.4.0
 (`contacts.list({ q })`). A row here is a promise that the gap
 is still real, so it is worth rereading at every SDK release.
 
