@@ -202,7 +202,7 @@ Notifies an external URL. The request body is fixed — `{ "tenantId", "enrollme
 curl -X POST https://api.tratto.email/v1/flows/flow_abc123/activate \
   -H "Authorization: Bearer tratto_live_..."
 
-# Deactivate — stops new enrollments, in-progress ones keep running
+# Deactivate: stops new enrollments and pauses the ones in progress
 curl -X POST https://api.tratto.email/v1/flows/flow_abc123/deactivate \
   -H "Authorization: Bearer tratto_live_..."
 ```

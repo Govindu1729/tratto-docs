@@ -202,7 +202,7 @@ Timeout di 10 secondi; i fallimenti vengono loggati ma non fermano il flusso.
 curl -X POST https://api.tratto.email/v1/flows/flow_abc123/activate \
   -H "Authorization: Bearer tratto_live_..."
 
-# Disattiva — ferma le nuove iscrizioni, quelle in corso continuano
+# Disattiva: ferma le nuove iscrizioni e mette in pausa quelle in corso
 curl -X POST https://api.tratto.email/v1/flows/flow_abc123/deactivate \
   -H "Authorization: Bearer tratto_live_..."
 ```
