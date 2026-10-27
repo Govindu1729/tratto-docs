@@ -1,12 +1,12 @@
 ---
 title: Node.js / TypeScript SDK
 description: SDK ufficiale Node.js per Tratto Email API
-updatedAt: 2026-10-01
+updatedAt: 2026-10-27
 ---
 
 SDK ufficiale per Node.js e TypeScript: **`@tratto/email`**
 
-Ogni esempio di questa pagina compila contro la versione indicata accanto, altrimenti contro la **1.2.0**. Dove una
+Ogni esempio di questa pagina compila contro la **1.7.0** pubblicata. Dove una
 funzionalità richiede una versione precisa, la pagina dichiara la minima che ce
 l'ha, mai la più recente: quella invecchia da sola.
 
@@ -253,7 +253,7 @@ console.log(campaign.status); // 'draft'
 ```
 
 <Callout type="info">
-L'API è più permissiva dei tipi della 1.6.0: accetta `html` inline al posto di
+L'API è più permissiva dei tipi della 1.7.0: accetta `html` inline al posto di
 un `templateId`, e interpreta un `audienceId` omesso come «tutti i contatti del
 workspace». Nessuna delle due cose è esprimibile con l'SDK: per quelle usa
 [HTTP](/it/docs/sdk-http).
@@ -333,8 +333,8 @@ console.log(webhook.secret); // whsec_xyz789...
 
 ## Analytics
 
-`AnalyticsPeriod` è `'7d' | '30d' | '90d' | '180d' | '1y'` (gli ultimi due dalla
-1.1.1):
+`AnalyticsPeriod` è `'7d' | '30d' | '90d' | '180d' | '1y'` (gli ultimi due
+richiedono la **1.1.1 o successiva**):
 
 ```typescript
 const summary = await tratto.analytics.getSummary('30d');
@@ -377,7 +377,7 @@ lo invia.
 
 ## Cosa l'SDK non copre ancora
 
-Questi endpoint esistono nell'API e **non hanno un metodo SDK** nella 1.6.0.
+Questi endpoint esistono nell'API e **non hanno un metodo SDK** nella 1.7.0.
 Chiamali via [HTTP](/it/docs/sdk-http) finché l'SDK non li recupera:
 
 | Funzionalità | HTTP |
@@ -393,14 +393,14 @@ Chiamali via [HTTP](/it/docs/sdk-http) finché l'SDK non li recupera:
 | Gestione delle chiavi API | `/v1/api-keys` |
 | Logo del marchio di workspace | `PUT`, `DELETE /v1/workspace/brand/logo` |
 
-Mancano dai tipi della 1.6.0 anche alcuni campi di risposta più recenti:
+Mancano dai tipi della 1.7.0 anche alcuni campi di risposta più recenti:
 `Workspace` non ha `limits` né `brand`, `Contact` non ha `trackingOptOut`,
 e `CampaignStats` non ha `skipped`,
 `untracked` né `variants`. L'API li restituisce; i tipi non li descrivono
 ancora. `TrattoError` espone `docs` ma non `suggestion`, che invece l'SDK
 Python ha.
 
-Verificato sulla `@tratto/email` 1.6.0 pubblicata, il 2026-10-21: le dieci righe
+Verificato sulla `@tratto/email` 1.7.0 pubblicata, il 2026-10-27: le dieci righe
 sono ancora scoperte, e `ListContactsParams.q` è coperto dalla 1.4.0
 (`contacts.list({ q })`). Ogni riga di questa tabella è la
 promessa che la lacuna c'è ancora: va riletta a ogni rilascio dell'SDK.
