@@ -135,9 +135,9 @@ Un hostname deve avere esattamente un record `v=spf1` (RFC 7208, sezione 3.2). C
 **Host:** `_dmarc.hello.tuodominio.it`  
 **Valore:** `v=DMARC1; p=quarantine; rua=mailto:dmarc@hello.tuodominio.it`
 
-Questo chiede ai server riceventi di mettere in quarantena la posta che non supera l'autenticazione. La policy vale per tutta la posta inviata a nome del dominio, non solo per quella inviata tramite Tratto: assicurati che gli altri servizi che inviano per il dominio siano autenticati prima di pubblicarla. Tieni un solo record DMARC per host. Tratto non controlla questo record, quindi puoi adattare la policy e l'indirizzo `rua`.
+Questo chiede ai server riceventi di mettere in quarantena la posta che non supera l'autenticazione. La policy vale per tutta la posta inviata a nome del dominio, non solo per quella inviata tramite Tratto: assicurati che gli altri servizi che inviano per il dominio siano autenticati prima di pubblicarla. Tieni un solo record DMARC per host. Tratto non controlla questo record, quindi puoi adattare la policy e l'indirizzo `rua`. Se non sei sicuro che tutti gli altri servizi che inviano a nome del dominio siano autenticati, parti con `p=none`, che chiede solo i report, leggili per qualche settimana e poi passa a `p=quarantine`.
 
-L'indirizzo `rua` suggerito è una casella sul dominio stesso, perché i report aggregati elencano IP e volumi di tutte le fonti che inviano a nome del tuo dominio, Tratto o no, e quei dati sono tuoi. Un `rua` su un altro dominio funziona solo se quel dominio pubblica un record di autorizzazione per il tuo (RFC 7489, sezione 7.1); senza, i server riceventi scartano i report. Tratto non controlla che la casella esista: creala, oppure fai puntare `rua` a un indirizzo dello stesso dominio che leggi già.
+L'indirizzo `rua` suggerito è una casella sul dominio stesso, perché i report aggregati elencano IP e volumi di tutte le fonti che inviano a nome del tuo dominio, Tratto o no, e quei dati sono tuoi. Un `rua` su un altro dominio funziona solo se quel dominio pubblica un record di autorizzazione per il tuo (RFC 7489, sezione 7.1); senza, i server riceventi scartano i report. Tratto non controlla che la casella esista, e non riceve né legge i tuoi report: creala, oppure fai puntare `rua` a un indirizzo dello stesso dominio che leggi già.
 
 ### 4. Record di proprietà (obbligatorio)
 
@@ -219,6 +219,21 @@ La risposta è il dominio completo, `records` inclusi, con `200` qualunque sia l
 - **Corrispondenza esatta**: il controllo confronta il dominio completo dopo la `@`. Verificare `tuodominio.it` non copre `hello.tuodominio.it`: aggiungi e verifica ogni dominio da cui invii.
 - **Invii di test**: le chiavi di test (`tratto_test_...`) saltano questo controllo. Vedi [Test mode](/it/docs/test-mode).
 - **Mittente generale**: quando un dominio diventa `verified` per la prima volta e il workspace non ha un mittente generale (`defaultFromEmail`), Tratto lo imposta a `noreply@` su quel dominio. I mittenti per tipo (marketing, automation, transactional) non vengono impostati in automatico: vedi [Mittenti](/it/docs/senders).
+
+### Dopo la verifica [#after-verification]
+
+Il controllo automatico guarda solo i domini `pending`. Una volta che un dominio
+è `verified`, nessuno lo ricontrolla a intervalli regolari:
+
+- Se in seguito togli o modifichi un CNAME DKIM o il record TXT di proprietà, il
+  dominio resta `verified` in Tratto. Tieni tutti i record al loro posto finché
+  invii da quel dominio.
+- `POST /v1/domains/{id}/verify` su un dominio verificato chiede di nuovo ad
+  Amazon SES lo stato attuale del DKIM. Se SES non trova più i record DKIM, il
+  dominio torna `pending` o `failed`, e le email live da quel dominio vengono
+  rifiutate finché non è di nuovo verificato. Il record di proprietà non viene
+  ricontrollato finché il dominio resta `verified`.
+- SPF e DMARC non vengono controllati, né prima né dopo la verifica.
 
 ## Controlla lo Status del Dominio
 

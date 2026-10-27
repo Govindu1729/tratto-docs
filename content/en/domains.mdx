@@ -135,9 +135,9 @@ A hostname must have exactly one `v=spf1` record (RFC 7208, section 3.2). With t
 **Host:** `_dmarc.hello.yourdomain.com`  
 **Value:** `v=DMARC1; p=quarantine; rua=mailto:dmarc@hello.yourdomain.com`
 
-This asks receiving servers to quarantine mail that fails authentication. The policy covers all mail sent as this domain, not only mail sent through Tratto, so make sure your other senders authenticate before you publish it. Keep a single DMARC record per host. Tratto doesn't check this record, so you can adapt the policy and the `rua` address.
+This asks receiving servers to quarantine mail that fails authentication. The policy covers all mail sent as this domain, not only mail sent through Tratto, so make sure your other senders authenticate before you publish it. Keep a single DMARC record per host. Tratto doesn't check this record, so you can adapt the policy and the `rua` address. If you are not sure that every other service sending as this domain authenticates, start with `p=none`, which only asks for reports, read them for a few weeks, then move to `p=quarantine`.
 
-The suggested `rua` is a mailbox on the domain itself, because aggregate reports list the IPs and volumes of every source sending as your domain, Tratto or not, and that data belongs to you. A `rua` on a different domain only works if that domain publishes an authorization record for yours (RFC 7489, section 7.1); without it, receivers drop the reports. Tratto doesn't check that the mailbox exists: create it, or point `rua` at an address on the same domain that you already read.
+The suggested `rua` is a mailbox on the domain itself, because aggregate reports list the IPs and volumes of every source sending as your domain, Tratto or not, and that data belongs to you. A `rua` on a different domain only works if that domain publishes an authorization record for yours (RFC 7489, section 7.1); without it, receivers drop the reports. Tratto doesn't check that the mailbox exists, and doesn't receive or read your reports: create it, or point `rua` at an address on the same domain that you already read.
 
 ### 4. Ownership Record (required)
 
@@ -219,6 +219,21 @@ The response is the full domain, `records` included, with `200` whatever the out
 - **Exact match**: the check compares the full domain after `@`. Verifying `yourdomain.com` does not cover `hello.yourdomain.com`: add and verify each domain you send from.
 - **Test sends**: test keys (`tratto_test_...`) skip this check. See [Test mode](/en/docs/test-mode).
 - **General default sender**: when a domain first becomes `verified` and your workspace has no general default sender (`defaultFromEmail`), Tratto sets it to `noreply@` on that domain. The per-type senders (marketing, automation, transactional) are not set automatically: see [Senders](/en/docs/senders).
+
+### After Verification [#after-verification]
+
+The automatic check looks only at `pending` domains. Once a domain is
+`verified`, nothing re-checks it on a schedule:
+
+- If you later remove or change a DKIM CNAME or the ownership TXT record, the
+  domain stays `verified` in Tratto. Keep all the records in place for as long
+  as you send from the domain.
+- `POST /v1/domains/{id}/verify` on a verified domain asks Amazon SES for the
+  current DKIM status again. If SES no longer reports the DKIM records as found,
+  the domain goes back to `pending` or `failed`, and live emails from it are
+  refused until it is verified again. The ownership record is not looked up
+  again while the domain stays `verified`.
+- SPF and DMARC are not checked, before or after verification.
 
 ## Check Domain Status
 
