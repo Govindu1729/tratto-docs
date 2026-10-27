@@ -13,12 +13,41 @@ Tratto runs on Google Cloud's EU region. Your data (contacts, email content, eve
 
 The Tratto marketing site loads no analytics scripts by default. Google Analytics 4 (via Google Tag Manager) only activates after a visitor explicitly accepts the cookie banner, and is configured to avoid collecting personally identifiable information.
 
-## One-Click Unsubscribe (RFC 8058)
+## Unsubscribe and the Preference Page
+Every campaign and flow email offers the recipient two ways out, and both work
+without any infrastructure on your side.
 
-Every email sent through Tratto carries `List-Unsubscribe` and `List-Unsubscribe-Post` headers, so mail clients that support one-click unsubscribe (Gmail, Outlook, and others) can act on it without a landing page. Unsubscribing moves a contact to `unsubscribed` status immediately: see [Contacts](/en/docs/contacts) for the API.
+**One-click unsubscribe in the mail client.** Campaign and flow emails carry
+the `List-Unsubscribe` and `List-Unsubscribe-Post` headers, so mail clients
+that support one-click unsubscribe (Gmail, Outlook and others) show their own
+unsubscribe button. The header always points at Tratto's API, never at a web
+page, and a click unsubscribes the contact at once. Transactional emails sent
+with `POST /v1/emails` are not tied to a contact and do not carry these headers.
+
+**The preference page.** The `{{unsubscribe_url}}` link in the email footer
+opens a page on `app.tratto.email/preferences` where the recipient can:
+
+- **unsubscribe** from every email of that sender;
+- **turn off open and click tracking** and keep receiving emails (see
+  [below](#tracking-pixel-consent-garante-privacy-order-no-2842026));
+- **subscribe again**, if they had unsubscribed. This is not offered to an
+  address suppressed after a bounce or a spam complaint: those stay suppressed,
+  and the page tells the recipient to contact the sender.
+
+Each link is signed and belongs to one contact, so the page needs no login.
+Unsubscribe links in emails sent before the page moved to `app.tratto.email`
+still work: they redirect to it. If your workspace has set its own unsubscribe
+page (`customUnsubscribeUrl` on `PATCH /v1/workspace`), the footer link goes
+there instead, with `contact` and `email` added to the query string; the
+one-click header keeps pointing at Tratto.
+
+Unsubscribing, from either path, moves the contact to `unsubscribed` and
+cancels the emails still waiting to go to them (they count as `skipped` in the
+campaign stats). See [Contacts](/en/docs/contacts) for the API.
 
 <Callout>
-Unsubscribing suppresses future sends immediately. It does not delete the contact record: see below.
+Unsubscribing stops future sends immediately. It does not delete the contact
+record: see below.
 </Callout>
 
 ## Tracking Pixel Consent (Garante Privacy Order No. 284/2026)
@@ -32,8 +61,16 @@ Italy's Data Protection Authority (Garante Privacy), Order No. 284 of 17 April 2
 **What Tratto does technically**: the open pixel (a transparent 1×1 GIF) and click tracking only fire for emails tied to a known contact (campaigns, flows), never for pure transactional sends like a password reset, where there's no engagement purpose to justify it. The open event never carries the recipient's address, only an internal identifier resolved server-side. Opens and clicks are recorded only within 30 days of sending: after that, a tracked link still takes the recipient to its destination, but the click is not recorded.
 
 <Callout type="warning">
-The notice and specific consent toward your own recipients are your responsibility, not Tratto's: you're the controller for your campaigns (see below). Tratto today offers a single opt-out mechanism, full list unsubscribe, not a separate "keep emailing me but stop tracking me" toggle. If that's a blocker for your compliance workflow, write to **privacy@tratto.email**.
+The notice and specific consent toward your own recipients are your responsibility, not Tratto's: you're the controller for your campaigns (see below). What Tratto provides is the granular revocation in point 3.
 </Callout>
+
+**Revoking tracking consent**: the [preference page](#unsubscribe-and-the-preference-page) has a separate switch that turns tracking off while the recipient stays subscribed. From then on, campaign and flow emails reach that recipient with no open pixel and no click tracking: both stop together. The choice applies to emails sent after it, and the recipient can turn tracking back on from the same page.
+
+What this means for you as the sender:
+
+- The contact shows `trackingOptOut: true` in the [Contacts API](/en/docs/contacts) and in the dashboard.
+- You can set the opt-out yourself (for example, to honour a request that reached you by email), but you cannot clear it: `PATCH /v1/contacts/:id` with `trackingOptOut: false` on a contact who opted out answers `403 FORBIDDEN`. Only the recipient can turn tracking back on.
+- Campaign stats count these recipients as `untracked` and leave them out of the open and click rates, which are never estimated for them: see [Campaigns](/en/docs/campaigns).
 
 ## Controller vs. Processor
 
