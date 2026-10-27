@@ -103,13 +103,17 @@ non esiste un carattere jolly.
   "emailId": "email_xyz789",
   "recipient": "user@example.com",
   "occurredAt": "2025-06-30T12:00:10Z",
-  "data": {}
+  "data": {},
+  "livemode": true
 }
 ```
 
 `data` contiene i dettagli specifici dell'evento ed è un oggetto vuoto quando non
 ce ne sono. Usa `id` per deduplicare: i retry consegnano lo stesso evento più di
 una volta.
+`livemode` è `false` per gli eventi generati dalle chiavi di test e
+dall'endpoint di consegna di prova manuale. Usalo per tenere il traffico di
+test fuori dai tuoi handler di produzione (vedi [Modalità test](/it/docs/test-mode)).
 
 `recipient` è l'indirizzo a cui si riferisce l'evento. Per `bounced` e
 `complained` è l'indirizzo segnalato dal server di posta del destinatario, e la
