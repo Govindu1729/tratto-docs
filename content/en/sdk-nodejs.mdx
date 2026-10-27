@@ -1,12 +1,12 @@
 ---
 title: Node.js / TypeScript SDK
 description: Official Node.js SDK for the Tratto Email API
-updatedAt: 2026-10-01
+updatedAt: 2026-10-27
 ---
 
 The official SDK for Node.js and TypeScript: **`@tratto/email`**
 
-Every example on this page typechecks against the version named next to it, and otherwise against **1.2.0**. Where a feature needs
+Every example on this page typechecks against the published **1.7.0**. Where a feature needs
 a particular version, the page names the minimum one that has it; it never
 names the newest, because that goes stale on its own.
 
@@ -250,7 +250,7 @@ console.log(campaign.status); // 'draft'
 ```
 
 <Callout type="info">
-The API itself is more permissive than the 1.6.0 types: it accepts inline
+The API itself is more permissive than the 1.7.0 types: it accepts inline
 `html` instead of a `templateId`, and treats an omitted `audienceId` as "every
 contact in the workspace". Neither is expressible through the SDK yet. Use
 [HTTP](/en/docs/sdk-http) for those.
@@ -330,8 +330,8 @@ console.log(webhook.secret); // whsec_xyz789...
 
 ## Analytics
 
-`AnalyticsPeriod` is `'7d' | '30d' | '90d' | '180d' | '1y'` (the last two since
-1.1.1):
+`AnalyticsPeriod` is `'7d' | '30d' | '90d' | '180d' | '1y'` (the last two
+require **1.1.1 or newer**):
 
 ```typescript
 const summary = await tratto.analytics.getSummary('30d');
@@ -373,7 +373,7 @@ It requires **1.6.0 or newer** and is `undefined` when the API sends none.
 
 ## What the SDK does not cover yet
 
-These endpoints exist in the API and have **no SDK method** in 1.6.0. Call
+These endpoints exist in the API and have **no SDK method** in 1.7.0. Call
 them over [HTTP](/en/docs/sdk-http) until the SDK catches up:
 
 | Capability | HTTP |
@@ -389,14 +389,14 @@ them over [HTTP](/en/docs/sdk-http) until the SDK catches up:
 | API key management | `/v1/api-keys` |
 | Workspace brand logo | `PUT`, `DELETE /v1/workspace/brand/logo` |
 
-Some newer response fields are likewise absent from the 1.6.0 types:
+Some newer response fields are likewise absent from the 1.7.0 types:
 `Workspace` has no `limits` or `brand`, `Contact` has no `trackingOptOut`,
 and `CampaignStats` has no `skipped`,
 `untracked` or `variants`. The API returns them; the types do not describe
 them yet. `TrattoError` carries `docs` but not `suggestion`, which the Python
 SDK does expose.
 
-Checked against the published `@tratto/email` 1.6.0 on 2026-10-21: the ten rows
+Checked against the published `@tratto/email` 1.7.0 on 2026-10-27: the ten rows
 are still uncovered, and `ListContactsParams.q` is covered from 1.4.0
 (`contacts.list({ q })`). A row here is a promise that the gap
 is still real, so it is worth rereading at every SDK release.
