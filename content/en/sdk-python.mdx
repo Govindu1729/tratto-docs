@@ -1,10 +1,15 @@
 ---
 title: Python SDK
 description: Official Python SDK for the Tratto Email API
+updatedAt: 2026-10-27
 ---
 
 The official SDK for Python: **`tratto-email`**. No external dependencies,
 built on `urllib`. Requires Python 3.10+.
+
+Every example on this page typechecks with mypy against the published
+**2.3.0**. Where a feature needs a particular version, the page names the
+minimum one that has it.
 
 ## Installation
 
@@ -19,6 +24,21 @@ from tratto import Tratto
 
 client = Tratto('tratto_live_...')
 ```
+
+`timeout` sets how long each request may wait, in **seconds**, for the
+connection and for each read. It requires **2.3.0 or newer** and defaults to
+`60`. A request that takes longer raises `TrattoError` with
+`code == 'timeout'` and `status_code == 0`:
+
+```python
+client = Tratto('tratto_live_...', timeout=10)
+```
+
+A send that timed out may still have reached the API. Retry it with the same
+[idempotency key](/en/docs/idempotency), so it cannot go out twice.
+
+From 2.3.0 the SDK percent-encodes every id it puts in a URL path, so an id
+containing `/`, `?` or `#` cannot change the route called.
 
 ## Send Email
 
@@ -93,6 +113,18 @@ result = client.emails.send(SendEmailOptions(
     scheduled_at='2025-07-01T09:00:00Z',
 ))
 ```
+
+While the email is still `scheduled` you can move it to another date or cancel
+it. Both methods require **2.3.0 or newer**:
+
+```python
+client.emails.reschedule('email_abc123', '2025-07-02T09:00:00Z')
+client.emails.cancel('email_abc123')  # its quota goes back to the month
+```
+
+Once the email has left `scheduled`, both raise `TrattoError` with code
+`CONFLICT` (409). Moving it to another UTC month can raise `QUOTA_EXCEEDED`
+(429) when that month is full, and `RATE_LIMITED` (429) is safe to retry.
 
 ## Send a Batch
 
@@ -253,6 +285,54 @@ webhook = client.webhooks.create(CreateWebhookOptions(
 print(webhook['data']['secret'])  # whsec_xyz789... (returned only once)
 ```
 
+## Verify Webhooks
+
+`verify_webhook` checks the `X-Tratto-Signature` header of a delivery and
+requires **2.3.0 or newer**. Pass the raw body exactly as received, before any
+JSON parsing. With Flask:
+
+```python
+import json
+import os
+
+from flask import Flask, request
+from tratto import verify_webhook
+
+app = Flask(__name__)
+
+
+@app.post('/webhooks/tratto')
+def tratto_webhook():
+    raw_body = request.get_data()  # bytes, before any parsing
+    if not verify_webhook(
+        raw_body,
+        request.headers.get('X-Tratto-Signature'),
+        os.environ['TRATTO_WEBHOOK_SECRET'],
+    ):
+        return {'error': 'Invalid signature'}, 401
+
+    event = json.loads(raw_body)
+    return {'ok': True}, 200
+```
+
+It returns `False` for a missing, malformed, stale or non-matching header, and
+raises `ValueError` only on an empty secret or a negative tolerance. The
+tolerance is 5 minutes either way; change it with `tolerance_seconds=600`. How
+the signature is built is in
+[Webhook Signature Verification](/en/docs/webhook-verification).
+
+## List Flows
+
+```python
+flows = client.flows.list(limit=20)
+active = [f for f in flows['data'] if f['status'] == 'active']
+```
+
+The `status` argument of `flows.list` is deprecated from **2.3.0**: the API
+ignores it and returns flows of every status, so passing it now emits a
+`DeprecationWarning`. Filter on each flow's `status` (`draft`, `active` or
+`inactive`) in the response instead, as above.
+
 ## Error Handling
 
 ```python
@@ -270,6 +350,9 @@ except TrattoError as e:
         # The message names the domain that is not verified.
         print(e)
 ```
+
+An error with `code == 'timeout'` and `status_code == 0` is the client
+[timeout](#initialization), not an API response.
 
 Besides `code` and `status_code`, `TrattoError` carries two fields from the API
 response, both from **1.2.0 or newer**: `suggestion`, the API's own words on

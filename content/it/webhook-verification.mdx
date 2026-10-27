@@ -1,6 +1,7 @@
 ---
 title: Verifica della Firma dei Webhook
 description: Verifica l'header X-Tratto-Signature, che firma un timestamp insieme al corpo.
+updatedAt: 2026-10-27
 ---
 
 Ogni webhook inviato da Tratto è firmato con HMAC-SHA256. **Verifica sempre la
@@ -42,7 +43,35 @@ firmato, ed è questo a renderlo affidabile per la protezione dai replay.
 4. Confronta con ciascuna `v1` a tempo costante, accettando se una corrisponde
 
 Il secret viene mostrato una sola volta alla creazione del webhook, nella forma
-`whsec_` seguito da 48 caratteri esadecimali.
+`whsec_` seguito da 48 caratteri esadecimali. La chiave dell'HMAC è il secret
+**intero**, prefisso `whsec_` compreso.
+
+## Con un SDK
+
+Ogni SDK ufficiale ha un helper che fa tutti e quattro i passi, con una
+tolleranza di 5 minuti in entrambe le direzioni:
+
+| SDK | Helper | Richiede |
+|---|---|---|
+| [Node.js](/it/docs/sdk-nodejs#verifica-i-webhook) | `verifyWebhook(rawBody, header, secret)` | `@tratto/email` 1.8.0 o successiva |
+| [Python](/it/docs/sdk-python#verifica-i-webhook) | `verify_webhook(raw_body, header, secret)` | `tratto-email` 2.3.0 o successiva |
+| [PHP](/it/docs/sdk-php#verifica-dei-webhook) | `Tratto\Webhook::verify($payload, $header, $secret)` | `tratto/email` 1.0.0 o successiva |
+
+```typescript
+import { verifyWebhook } from '@tratto/email';
+
+const ok = verifyWebhook(rawBody, request.headers.get('x-tratto-signature'), secret);
+```
+
+```python
+from tratto import verify_webhook
+
+ok = verify_webhook(raw_body, request.headers.get('X-Tratto-Signature'), secret)
+```
+
+Tutti restituiscono un booleano e non lanciano mai eccezioni per un header
+sbagliato. Il codice qui sotto fa la stessa cosa a mano, per un runtime senza
+SDK o con una versione dell'SDK precedente.
 
 ## Node.js
 

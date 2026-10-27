@@ -1,6 +1,7 @@
 ---
 title: Webhook Signature Verification
 description: Verify the X-Tratto-Signature header, which signs a timestamp together with the body.
+updatedAt: 2026-10-27
 ---
 
 Every webhook Tratto sends is signed with HMAC-SHA256. **Always verify the
@@ -42,7 +43,34 @@ material, which is what makes it trustworthy for replay protection.
 4. Compare against each `v1` in constant time, accepting if any matches
 
 Your secret is shown once when the webhook is created, in the form
-`whsec_` followed by 48 hex characters.
+`whsec_` followed by 48 hex characters. The HMAC key is the **whole** secret,
+`whsec_` prefix included.
+
+## With an SDK
+
+Each official SDK has a helper that does all four steps, with a 5 minute
+tolerance either way:
+
+| SDK | Helper | Requires |
+|---|---|---|
+| [Node.js](/en/docs/sdk-nodejs#verify-webhooks) | `verifyWebhook(rawBody, header, secret)` | `@tratto/email` 1.8.0 or later |
+| [Python](/en/docs/sdk-python#verify-webhooks) | `verify_webhook(raw_body, header, secret)` | `tratto-email` 2.3.0 or later |
+| [PHP](/en/docs/sdk-php#verify-webhooks) | `Tratto\Webhook::verify($payload, $header, $secret)` | `tratto/email` 1.0.0 or later |
+
+```typescript
+import { verifyWebhook } from '@tratto/email';
+
+const ok = verifyWebhook(rawBody, request.headers.get('x-tratto-signature'), secret);
+```
+
+```python
+from tratto import verify_webhook
+
+ok = verify_webhook(raw_body, request.headers.get('X-Tratto-Signature'), secret)
+```
+
+All of them return a boolean and never throw on a bad header. The code below
+does the same by hand, for a runtime without the SDK or an older SDK version.
 
 ## Node.js
 
