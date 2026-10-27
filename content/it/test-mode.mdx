@@ -1,0 +1,120 @@
+---
+title: Modalità test
+description: Sviluppa e prova tutto il flusso email (stati, timeline, webhook) senza inviare email vere
+updatedAt: 2026-10-27
+---
+
+Ogni workspace ha due ambienti di chiavi, come su Stripe:
+
+| | Test: `tratto_test_...` | Live: `tratto_live_...` |
+|---|---|---|
+| Consegna | **Simulata**: non parte mai nulla | Reale, tramite la nostra infrastruttura di invio |
+| Dominio mittente | Qualsiasi indirizzo sintatticamente valido | Deve essere un dominio verificato |
+| Quota mensile | Non toccata (limite proprio: 100 email di test al giorno, ogni destinatario conta come una) | Conta sulla quota del piano |
+| Stati, timeline, webhook | Identici al live | Gli stessi |
+| Visibilità dei dati | Una chiave di test vede solo dati di test | Una chiave live vede solo dati live |
+| Conservazione | Cancellate 7 giorni dopo la creazione | Cancellate 90 giorni dopo l'invio, su ogni piano |
+
+Il senso è questo: la tua integrazione (invio, polling dello stato, gestione dei
+webhook e dei bounce) gira sulla stessa identica pipeline della produzione,
+prima di qualunque configurazione DNS e senza alcun rischio di scrivere a una
+persona vera.
+
+## Indirizzi del simulatore
+
+È l'indirizzo del destinatario a scegliere l'esito simulato:
+
+| Destinatario | Esito |
+|------|-------|
+| qualsiasi indirizzo | evento `delivered`, l'email finisce `delivered` |
+| `bounced@simulator.tratto.email` | bounce permanente, l'email finisce `bounced`, evento `bounced` con `type: "Permanent"` |
+| `soft-bounced@simulator.tratto.email` | bounce temporaneo, anche questa email finisce `bounced`, evento `bounced` con `type: "Transient"` |
+| `complained@simulator.tratto.email` | segnalazione di spam, evento `complained` |
+
+Il dominio `simulator.tratto.email` non riceve mai posta: esiste solo come
+selettore.
+
+## Il flag `livemode`
+
+Tutto ciò che una chiave di test tocca è marcato:
+
+- le risposte di `POST /v1/emails` contengono `"livemode": false`
+- i payload dei webhook contengono `"livemode": false` (gli eventi live hanno
+  `"livemode": true`): basati su questo campo, non su euristiche
+- la dashboard mostra un banner **Modalità test** e i badge TEST quando il
+  selettore Live/Test è su Test
+
+## Isolamento degli ambienti
+
+Test e live sono due viste separate dello stesso workspace:
+
+- `GET /v1/emails` con una chiave di test elenca solo le email di test, con una
+  chiave live solo quelle live
+- leggere, annullare o riprogrammare un'email dell'altro ambiente restituisce
+  `404`, indistinguibile da un id inesistente
+- le chiavi di idempotenza valgono per ambiente
+
+### Campagne
+
+Una campagna appartiene all'ambiente della chiave che l'ha creata:
+`POST /v1/campaigns` prende `livemode` dalla chiave, mai dal corpo della
+richiesta. **Ogni** endpoint delle campagne poi lo controlla: lettura,
+`PATCH`, `DELETE`, `/stats`, `/links`, `/send`, `/pause`, `/unschedule` e
+`/test-send`. Una chiave di test che punta a una campagna live riceve `404`, su
+tutti.
+
+<Callout type="warn">
+È più restrittivo di prima del 2026-09-04. `POST /v1/campaigns/{id}/pause` e
+`POST /v1/campaigns/{id}/unschedule` agivano su una campagna live anche se
+chiamati con una chiave di test. **Ora rispondono `404` e non fanno nulla.** Se
+uno script mette in pausa campagne live, gli serve una chiave live.
+</Callout>
+
+**`404`, non `403`**, di proposito. Una campagna dell'altro ambiente risponde
+esattamente come una che non esiste, così un id non si può sondare da un
+ambiente all'altro.
+
+Una campagna creata prima che il campo esistesse non ha `livemode` e conta come
+**live**.
+
+## Cosa non possono fare le chiavi di test
+
+Gli endpoint che raggiungono destinatari reali rifiutano le chiavi di test con
+`403 TEST_MODE_NOT_SUPPORTED`, in qualunque ambiente stia la risorsa:
+
+- inviare o programmare una campagna (`POST /v1/campaigns/{id}/send`)
+- gli invii di prova di campagne e template (consegnano email vere)
+- attivare un flow
+
+Tutto il resto di una campagna è disponibile a una chiave di test, ma solo su
+una campagna **di test**. Su una live è un `404`, per la regola qui sopra. Dato
+che una campagna di test non può mai essere inviata, in modalità test `/pause`
+e `/unschedule` non hanno nulla su cui agire: esistono, semplicemente non hanno
+mai lavoro da fare.
+
+Gli eventi simulati non toccano mai le tue statistiche, lo stato di
+soppressione dei contatti né le statistiche delle campagne.
+
+## Limite giornaliero
+
+La modalità test ha un limite tutto suo: **100 email di test al giorno**, che si
+azzera a mezzanotte UTC (richiede l'API 0.21.0 o successiva). Come per la quota
+mensile, ogni indirizzo distinto in `to`, `cc` e `bcc` conta come un'email.
+Un'email che supererebbe il limite viene rifiutata per intero con
+`429 QUOTA_EXCEEDED`, e un'email rifiutata non consuma il limite:
+
+```json
+{
+  "error": {
+    "code": "QUOTA_EXCEEDED",
+    "message": "Test mode daily limit of 100 emails reached: this email has 3 recipients, and each distinct address in to, cc and bcc counts as one email.",
+    "docs": "https://docs.tratto.email/en/docs/error-codes"
+  }
+}
+```
+
+## Passare al live
+
+Cambia la chiave, e basta: stessa forma della richiesta, stesso schema di firma
+dei webhook. Una chiave live richiede un [dominio mittente verificato](/it/docs/domains)
+e conta sulla quota del piano.

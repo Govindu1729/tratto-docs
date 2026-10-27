@@ -70,6 +70,53 @@ Because the content is copied at creation, the check is not retroactive:
 campaigns created before this gate existed keep their copy and still send.
 </Callout>
 
+## A/B Subject Test [#ab-test]
+
+Set `subjectB` to test a second subject line against `subjectA`. Content,
+sender and audience stay the same: only the subject changes.
+
+- **How recipients are split.** Subjects alternate recipient by recipient: the
+  first recipient gets `subjectA`, the second `subjectB`, and so on. Each subject
+  reaches half the audience, with one more for A on an odd count.
+- **After a pause.** A resumed campaign carries on the alternation where it
+  stopped instead of restarting on A, so the split stays even.
+- **Test sends.** `POST /v1/campaigns/:id/test-send` always uses `subjectA`,
+  prefixed with `[TEST]`.
+- **Removing B.** Send `"subjectB": null` with `PATCH /v1/campaigns/:id`. Like
+  every edit, this works only on a `draft` campaign: any other status is a
+  **409** `Campaign is '<status>'. Only draft campaigns can be edited.`
+- **No automatic winner.** Tratto does not pick a subject or send the better one
+  to the rest of the list: both go out until the campaign ends. Compare the two
+  and decide.
+
+### Reading the result
+
+`GET /v1/campaigns/:id/stats` adds a `variants` object with one entry per
+subject, both in `stats` (counts) and in `rates` (percentages):
+
+```json
+{
+  "stats": {
+    "variants": {
+      "a": { "sent": 2500, "delivered": 2475, "opened": 1300, "clicked": 390, "bounced": 20, "untracked": 70 },
+      "b": { "sent": 2500, "delivered": 2475, "opened": 1175, "clicked": 352, "bounced": 20, "untracked": 60 }
+    }
+  },
+  "rates": {
+    "variants": {
+      "a": { "deliveryRate": 99, "openRate": 53.5, "clickRate": 16.05, "bounceRate": 0.8 },
+      "b": { "deliveryRate": 99, "openRate": 48.16, "clickRate": 14.43, "bounceRate": 0.8 }
+    }
+  }
+}
+```
+
+Each variant's rates are computed on that variant's own `sent`, and its open
+and click rates leave out that variant's `untracked` recipients, the same rule
+as the campaign totals ([below](#get-campaign-stats)). `variants` is present
+only on a campaign that started sending with a `subjectB`: on any other
+campaign the key is absent, not filled with zeros.
+
 ## Campaign Variables [#campaign-variables]
 
 A campaign fills exactly four variables, resolved per recipient when the send
@@ -476,11 +523,14 @@ Field notes:
   dispatched
 - `skipped` — sends cancelled because the contact unsubscribed after dispatch.
   They never happened, so they feed no rate
-- `untracked` — recipients who opted out of open/click tracking. They are
-  **excluded from the openRate/clickRate denominator**, never estimated. The
-  `untracked` key inside `rates` is that same count, not a rate
+- `untracked`: recipients who had opted out of open and click tracking when
+  the campaign reached them. Their opens and clicks are never recorded, so they
+  are **excluded from the openRate/clickRate denominator**, never estimated:
+  `openRate` is `opened / (total - untracked)`. Counting them would push the
+  rates down for people we deliberately do not measure. The `untracked` key
+  inside `rates` is that same count, not a rate
 - `stats.variants` and `rates.variants` appear only on a campaign that ran an
-  A/B subject test
+  [A/B subject test](#ab-test)
 - There is **no `complained`** field, and no `totalSent`
 
 ## List Campaigns

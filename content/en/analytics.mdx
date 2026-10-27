@@ -63,6 +63,8 @@ All rates are **percentages** (`98.5` means 98.5%, not `0.985`).
 | `clickRate` | clicked / opened (falls back to totalSent) |
 | `bounceRate` | bounced / totalSent |
 
+These are workspace-wide rates. For one campaign, including the per-subject results of an [A/B subject test](/en/docs/campaigns#ab-test), use `GET /v1/campaigns/:id/stats`: its open and click rates leave out recipients who opted out of tracking.
+
 ## Timeseries Data
 
 Get daily breakdown of metrics.
