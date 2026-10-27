@@ -63,6 +63,8 @@ Tutti i tassi sono **percentuali** (`98.5` significa 98.5%, non `0.985`).
 | `clickRate` | clicked / opened (ricade su totalSent) |
 | `bounceRate` | bounced / totalSent |
 
+Questi sono tassi dell'intero workspace. Per una singola campagna, compresi i risultati per oggetto di un [test A/B](/it/docs/campaigns#ab-test), usa `GET /v1/campaigns/:id/stats`: i suoi tassi di apertura e di click escludono i destinatari che hanno rifiutato il tracciamento.
+
 ## Dati Timeseries
 
 Ottieni scomposizione giornaliera delle metriche.
