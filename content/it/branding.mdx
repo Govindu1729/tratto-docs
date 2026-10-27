@@ -1,7 +1,7 @@
 ---
 title: Footer Email & Branding
-description: Quando Tratto aggiunge un footer alle tue email — il badge "Sent using Tratto", obbligatorio su alcuni piani (oggi Free) e facoltativo sugli altri.
-updatedAt: 2026-10-24
+description: Quando Tratto aggiunge un footer alle tue email (il badge "Sent using Tratto", obbligatorio su alcuni piani e facoltativo sugli altri) e come impostare via API colori e logo del marchio.
+updatedAt: 2026-10-27
 ---
 
 Tratto può aggiungere un piccolo footer alla versione HTML delle email che invii. Esistono due varianti:
@@ -63,6 +63,125 @@ Da sapere:
 | Altri piani | `false` / non impostato (default) | Plain disiscrizione | Nessun footer | Nessun footer |
 
 Indipendentemente dal footer, ogni email inviata tramite Tratto porta gli header di disiscrizione one-click RFC 8058 — vedi [Privacy & Compliance](/it/docs/privacy).
+
+## Colori e logo del marchio
+
+Il marchio del workspace (un tema, tre colori e un logo) viene applicato quando
+si renderizzano i [template Markdown](/it/docs/emailmd-templates); quella
+pagina spiega dove finisce ogni colore nell'email. Questa sezione è l'API per
+impostarlo. Lo puoi impostare anche da **Settings → Workspace** in
+dashboard.
+
+Tutte le rotte qui sotto richiedono `workspace:write`. Con una sessione di
+dashboard può usarle solo il proprietario del workspace. `GET /v1/workspace`
+restituisce i valori attuali nell'oggetto `brand`.
+
+### Tema e colori
+
+Manda un oggetto `brand` a `PATCH /v1/workspace`:
+
+```bash
+curl -X PATCH https://api.tratto.email/v1/workspace \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"brand": {"theme": "light", "primaryColor": "#C8382A", "accentColor": null}}'
+```
+
+| Campo | Valore | A cosa serve |
+|-------|--------|--------------|
+| `theme` | `light`, `dark` o `auto` | La palette di partenza. `auto` segue l'impostazione chiara o scura di chi legge. Un template che dichiara il proprio `theme` vince comunque |
+| `primaryColor` | `#RRGGBB` | Link e sfondo dei pulsanti primari |
+| `secondaryColor` | `#RRGGBB` | Bordo ed etichetta dei pulsanti secondari |
+| `accentColor` | `#RRGGBB` | Divisori e linee orizzontali |
+
+L'aggiornamento è parziale: una chiave che ometti mantiene il valore salvato,
+una chiave a `null` viene azzerata. I colori vanno scritti con sei cifre
+esadecimali, come `#C8382A`: un `#C83` a tre cifre o un nome come `red`
+rispondono `422 VALIDATION_ERROR`.
+
+La risposta è l'intero workspace, con il `brand` aggiornato. L'array
+`contrastWarnings` segnala i colori che rischiano di leggersi male
+(`primary_low_contrast`, `secondary_low_contrast`, `button_label_low_contrast`,
+ciascuno con il suo `ratio` di contrasto). Sono solo consigli: il colore viene
+salvato e applicato lo stesso.
+
+**Il logo non si imposta da qui.** `logoUrl`, `logoWidth` e `logoHeight` li
+gestisce il server. Se li mandi dentro `brand` vengono scartati senza errore e
+il logo salvato non cambia. È ciò che impedisce di far puntare le email inviate
+da Tratto a un'immagine ospitata altrove: l'unico modo per impostare un logo è
+caricarne il file.
+
+### Carica il logo
+
+`PUT /v1/workspace/brand/logo` vuole come corpo della richiesta il file
+dell'immagine così com'è, non JSON e non un form:
+
+```bash
+curl -X PUT https://api.tratto.email/v1/workspace/brand/logo \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: image/png" \
+  --data-binary @logo.png
+```
+
+| Regola | Se non è rispettata |
+|--------|---------------------|
+| `Content-Type` è `image/png` o `image/jpeg` | `415 UNSUPPORTED_MEDIA_TYPE`, prima ancora di leggere il file. È la risposta per `image/svg+xml`, `image/webp` e `image/gif` |
+| Il file è davvero un PNG o un JPEG. Il formato si legge dai byte del file, non dall'header | `422 VALIDATION_ERROR` |
+| Al massimo 150 KB (153.600 byte) | `413 PAYLOAD_TOO_LARGE` |
+| Al massimo 600 px sul lato lungo | `422 VALIDATION_ERROR` |
+| Almeno 8 px su entrambi i lati una volta adattato all'email | `422 VALIDATION_ERROR` |
+
+SVG, WebP e GIF sono rifiutati perché Gmail e Outlook li eliminano o li
+mostrano male. L'email adatta il logo dentro un riquadro di 160 × 64 px,
+mantenendo le proporzioni e senza mai ingrandirlo; un'immagine molto allungata
+può ridursi a una striscia, ed è l'ultima regola della tabella.
+
+**Risposta:**
+```json
+{
+  "data": {
+    "theme": null,
+    "primaryColor": null,
+    "secondaryColor": null,
+    "accentColor": null,
+    "logoUrl": "https://assets.tratto.email/l/<sha256>.png",
+    "logoWidth": 320,
+    "logoHeight": 128,
+    "logoBytes": 24576,
+    "logoDisplayWidth": 160,
+    "logoDisplayHeight": 64,
+    "logoWarnings": [],
+    "contrastWarnings": []
+  }
+}
+```
+
+`logoDisplayWidth` e `logoDisplayHeight` sono le dimensioni con cui il logo
+compare nell'email. `logoWarnings` contiene consigli, mai rifiuti:
+
+| Codice | Quando |
+|--------|--------|
+| `logo_low_resolution` | L'immagine è larga meno del doppio della larghezza con cui viene mostrata, quindi sugli schermi ad alta densità risulta sfocata |
+| `logo_too_small` | Viene mostrata alta meno di 24 px |
+| `logo_heavy` | Il file supera i 60 KB (61.440 byte); ogni destinatario lo scarica a ogni apertura |
+
+Ogni avviso riporta `actual` e `recommended`: pixel per i due codici sulle
+dimensioni, byte per `logo_heavy`.
+
+Il file salvato prende il nome dal suo contenuto e non cambia mai. Caricare un
+nuovo logo produce un nuovo `logoUrl`, e quello vecchio continua a funzionare:
+le email già consegnate mostrano il logo con cui sono partite.
+
+### Rimuovi il logo
+
+```bash
+curl -X DELETE https://api.tratto.email/v1/workspace/brand/logo \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+Restituisce `200` con l'oggetto `brand` e i campi del logo a `null`. Le email
+inviate da quel momento non hanno logo. Il file salvato non viene cancellato,
+perché le email già consegnate lo richiamano ancora.
 
 ## Prossimi Passi
 

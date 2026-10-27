@@ -1,7 +1,7 @@
 ---
 title: "Templates: Create, Version & Test"
 description: Manage versioned email templates with variable substitution
-updatedAt: 2026-10-24
+updatedAt: 2026-10-27
 ---
 
 **Templates** are reusable email templates with placeholder variables. Instead of composing HTML in code every time, define a template once and send it hundreds of times with different variables.
@@ -329,13 +329,66 @@ is taken before the email is handed to the queue.
 
 ## List Templates
 
-Get all templates for your tenant.
+List the templates of your workspace, newest first, one page at a time.
+Requires `templates:read`.
 
 **cURL**
 ```bash
-curl https://api.tratto.email/v1/templates \
+curl "https://api.tratto.email/v1/templates?status=published&limit=50" \
   -H "Authorization: Bearer tratto_live_..."
 ```
+
+**Query parameters:**
+
+| Parameter | Default | What it does |
+|-----------|---------|--------------|
+| `limit` | `50` | Results per page, 1 to 100 |
+| `after` | none | The `nextCursor` of the previous page |
+| `status` | none | `draft` or `published`. Any other value answers `422` |
+| `include` | none | `html` adds each template's `html` to the rows. The only accepted value |
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "id": "tmpl_abc123",
+      "name": "Welcome",
+      "status": "published",
+      "format": "html",
+      "version": 2,
+      "createdAt": "2025-06-30T12:00:00Z",
+      "updatedAt": "2025-07-02T09:30:00Z"
+    }
+  ],
+  "pagination": {
+    "hasMore": true,
+    "nextCursor": "tmpl_abc123"
+  }
+}
+```
+
+The rows carry no `html` unless you ask for it with `include=html`: it is the
+largest field of a template and most lists do not need it. For everything else
+about one template, use [Get a Template](#get-a-template).
+
+**The list stops at one page.** Without `after` you get the 50 newest
+templates and nothing tells you there are more except `pagination.hasMore`. To
+read them all, pass `nextCursor` as `after` until `hasMore` is `false`:
+
+```bash
+# First page
+curl "https://api.tratto.email/v1/templates?limit=100" \
+  -H "Authorization: Bearer tratto_live_..."
+
+# Next page: after = the nextCursor you just received
+curl "https://api.tratto.email/v1/templates?limit=100&after=tmpl_abc123" \
+  -H "Authorization: Bearer tratto_live_..."
+```
+
+On the last page `hasMore` is `false` and `nextCursor` is `null`. A cursor that
+does not match an existing template is ignored and the list starts again from
+the first page. Keep the same `status` on every page of one walk.
 
 ## Get a Template
 
