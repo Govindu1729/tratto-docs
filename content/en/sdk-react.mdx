@@ -8,9 +8,10 @@ applications send email from the server, using
 [`@tratto/email`](/en/docs/sdk-nodejs) inside a Server Component, a Server Action
 or a Route Handler.
 
-This is not a limitation of Tratto. No transactional email provider ships a
-browser SDK, because an API key grants full access to the account: send as your
-verified domains, read your contacts, mint new keys, delete the workspace. A key
+The reason is the API key. Anyone who holds a key acts as your workspace, within
+the key's [permissions](/en/docs/authentication#permissions): with `*` that means
+sending as your verified domains, reading your contacts and creating new keys.
+Even a key limited to `emails:send` lets anyone send mail as your domain. A key
 in the browser bundle is a key you have published.
 
 React is unusually well suited to this. Server Components give you a real

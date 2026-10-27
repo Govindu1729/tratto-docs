@@ -7,10 +7,12 @@ description: Send email from an Angular application using @tratto/email on the s
 using [`@tratto/email`](/en/docs/sdk-nodejs) in the Node process that renders or
 serves the app.
 
-An API key grants full access to your workspace: send as your verified domains,
-read your contact list, mint new API keys, change the workspace settings. A key shipped to the browser is public: readable in the JavaScript
-bundle, in DevTools and in the network tab. No obfuscation changes that, which is
-why no email provider ships a browser SDK.
+Anyone who holds an API key acts as your workspace, within the key's
+[permissions](/en/docs/authentication#permissions): with `*` that means sending
+as your verified domains, reading your contact list, creating new API keys and
+changing the workspace settings. A key shipped to the browser is public:
+readable in the JavaScript bundle, in DevTools and in the network tab. No
+obfuscation changes that, which is why Tratto has no browser SDK.
 
 ## The Angular-specific trap
 

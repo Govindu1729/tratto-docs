@@ -7,10 +7,12 @@ description: Invia email da React usando @tratto/email sul server. Non esiste un
 inviano email dal server, usando [`@tratto/email`](/it/docs/sdk-nodejs) dentro un
 Server Component, una Server Action o un Route Handler.
 
-Non è un limite di Tratto. Nessun provider di email transazionali pubblica un SDK
-per browser, perché una chiave API dà accesso completo all'account: inviare dai
-tuoi domini verificati, leggere i contatti, creare nuove chiavi, eliminare il
-workspace. Una chiave nel bundle browser è una chiave che hai pubblicato.
+Il motivo è la chiave API. Chi possiede una chiave agisce come il tuo workspace,
+nei limiti dei suoi [permessi](/it/docs/authentication#permessi): con `*` può
+inviare dai tuoi domini verificati, leggere i contatti e creare nuove chiavi.
+Anche una chiave limitata a `emails:send` permette a chiunque di inviare email a
+nome del tuo dominio. Una chiave nel bundle browser è una chiave che hai
+pubblicato.
 
 React si presta particolarmente bene a questo approccio. I Server Component
 offrono un vero confine di compilazione (il codice in un file server non
