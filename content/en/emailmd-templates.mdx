@@ -59,7 +59,7 @@ renderer:
 | `lang` | The document language, written to the `lang` attribute of the rendered HTML. A language tag: `en`, `it`, `pt-BR`. |
 | `dir` | Text direction — `ltr` (default), `rtl` or `auto`. `rtl` flips the default alignment to the right. |
 | `breaks` | `true` turns a single newline into a line break; `false` (the default) keeps standard markdown, where paragraphs are separated by a blank line. |
-| `theme` | `light` (default), `dark`, or `auto` (renders light but adapts to readers whose mail client is in dark mode). Only these three values — anything else is ignored, with a warning. |
+| `theme` | `light`, `dark`, or `auto` (renders light but adapts to readers whose mail client is in dark mode). Only these three values: anything else is ignored, with a warning. Without it the document uses the [workspace theme](#making-a-campaign-look-different), and `light` if the workspace has none. |
 
 **Every other key is removed before the render and reported as a
 [render warning](#render-warnings).** In particular:
@@ -112,6 +112,34 @@ Acme Inc — Milano
   `::: callout center compact`.
 - **`::: footer`** — smaller, muted text at the bottom for legal text,
   unsubscribe links and company information.
+- **`::: include brand-header`**: the [workspace logo](#the-workspace-logo),
+  in a header band. A single line, with no closing `:::`.
+
+### The workspace logo
+
+Uploading a logo does not put it in every email. A document shows it only if
+it asks for it, with this line where the logo should go (usually the first
+line after the frontmatter):
+
+```markdown
+::: include brand-header
+
+# Your order has shipped
+```
+
+At render time the line becomes a `::: header` band holding the logo, with the
+workspace name as its alt text. It is opt-in on purpose: a logo belongs on a
+newsletter, not necessarily on a password reset, and deleting the line is
+enough to drop it from one template.
+
+The logo is drawn inside a **160 × 64 px box**: scaled down to fit, keeping its
+proportions, and **never enlarged**. A logo smaller than the box is drawn at
+its own size. Upload rules and the warnings about small or heavy files are in
+[Branding](/en/docs/branding#upload-the-logo).
+
+If the workspace has no logo, the line renders nothing and the render reports
+the warning `Unknown partial "brand-header"`. The rest of the email is
+unaffected.
 
 ### Buttons
 
@@ -133,18 +161,34 @@ that is by design.
 
 ## Making a campaign look different
 
-Colours and logo are a **workspace** setting, shared by every template; the
-only per-document lever is `theme`.
+Theme, colours and logo are a **workspace** setting, shared by every
+template. A document can only pick its own `theme` and choose whether to show
+the logo.
 
-- **Workspace brand** — the three brand colours (links and primary buttons,
-  secondary buttons, dividers) and the workspace logo are set in
-  **Settings → Workspace** in the dashboard, or through `PATCH /v1/workspace`
-  (the `brand` object) and `PUT /v1/workspace/brand/logo`. The renderer applies
-  them, so a change reaches every render that happens after it — but not the
-  HTML already pinned on templates you saved earlier, which keeps its colours
-  until the template is saved again.
-- **Per document** — `theme: dark`, or `theme: auto` for a rendering that
-  follows the reader's mail client. That is the whole list.
+- **Workspace brand**: a default theme, the three brand colours and the logo
+  are set in **Settings → Workspace** in the dashboard, or through
+  `PATCH /v1/workspace` (the `brand` object) and `PUT /v1/workspace/brand/logo`
+  (API details in [Branding](/en/docs/branding#brand-colours-and-logo)). The
+  colours land here:
+
+  | Brand field | Where it shows in the email |
+  |---|---|
+  | `primaryColor` | Links, and the background of primary buttons (`{button}`) |
+  | `secondaryColor` | Border and label of secondary buttons (`{button.secondary}`) |
+  | `accentColor` | Dividers and horizontal rules |
+  | `theme` | The palette (`light`, `dark`, `auto`) of documents that do not set their own `theme` |
+
+- **Per document**: `theme: light`, `theme: dark` or `theme: auto` in the
+  frontmatter overrides the workspace theme, and `::: include brand-header`
+  shows the logo. That is the whole list.
+
+**The brand is applied when the markdown is rendered, not when the email is
+sent.** A brand change reaches every render after it, but not the HTML already
+pinned on templates and campaigns saved earlier. A template is re-rendered only
+when its markdown changes: saving the same markdown again does not pick up a
+new logo or new colours. Edit the markdown (even a single character) and save,
+or check the result first with `render-preview`, which always uses the current
+brand.
 
 There is no per-template colour, font or custom palette override, and that is
 deliberate: what the workspace configured is what recipients get.
@@ -263,10 +307,42 @@ curl -X POST https://api.tratto.email/v1/emails \
   }'
 ```
 
-Campaigns work the same way: pick the template in the
-[campaign builder](/en/docs/campaigns) and the campaign uses the pinned HTML —
-click tracking, open pixel and the unsubscribe footer are applied at delivery
-exactly as for HTML templates.
+Campaigns start from a published template too: see the next section.
+
+## Editing markdown inside a campaign
+
+A campaign created from a Markdown template **owns its own copy** of the
+markdown. From then on the template is where the campaign came from, not a
+live link:
+
+- **At creation the content is copied, not re-rendered.** The campaign gets
+  the template's `source` and the HTML pinned on it, exactly as you reviewed
+  them in the template editor.
+- **Editing the template later does not change the campaign**, and editing the
+  campaign never touches the template.
+- **To change the text, edit the campaign.** `PATCH /v1/campaigns/:id` with a
+  `markdown` field (or the markdown editor in the campaign page of the
+  dashboard) re-renders the campaign's HTML with the current workspace brand.
+
+```bash
+curl -X PATCH https://api.tratto.email/v1/campaigns/camp_xyz789 \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"markdown": "::: include brand-header\n\n# October news\n\nThree things we shipped."}'
+```
+
+The same rules as for templates apply:
+
+| Request | Result |
+|---|---|
+| `markdown` on a Markdown campaign in `draft` | Re-rendered and saved; warnings in the campaign's `renderWarnings` |
+| `html` on a Markdown campaign, or `markdown` on an HTML one | `422 VALIDATION_ERROR` |
+| `html` and `markdown` together | `422 VALIDATION_ERROR` |
+| Any edit on a campaign that is no longer `draft` | `409 CONFLICT` |
+| `templateId` | Replaces the content with a fresh copy of that template (which must be published). It is the only way to change a campaign's format |
+
+At delivery, click tracking, the open pixel and the unsubscribe footer are
+applied exactly as for HTML campaigns.
 
 ## Sending markdown without a template
 
@@ -290,6 +366,8 @@ The ones you are most likely to meet:
   boolean. The renderer falls back to the default and says so.
 - **An unknown directive parameter** — e.g. a word on a `::: callout` line
   that is not one of the documented ones.
+- **`Unknown partial "brand-header"`**: the document includes the logo but
+  the workspace has none uploaded. Nothing is drawn in its place.
 
 Only two situations reject the request outright, both with
 `VALIDATION_ERROR` (422):
