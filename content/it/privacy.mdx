@@ -13,12 +13,46 @@ Tratto gira sulla regione UE di Google Cloud. I tuoi dati (contatti, contenuto d
 
 Il sito marketing di Tratto non carica script di analytics per default. Google Analytics 4 (via Google Tag Manager) si attiva solo dopo che un visitatore accetta esplicitamente il cookie banner, ed è configurato per non raccogliere dati personalmente identificabili.
 
-## Disiscrizione One-Click (RFC 8058)
+## Disiscrizione e pagina delle preferenze
+Ogni email di campagna o di flusso offre al destinatario due modi per uscire,
+ed entrambi funzionano senza alcuna infrastruttura da parte tua.
 
-Ogni email inviata tramite Tratto include gli header `List-Unsubscribe` e `List-Unsubscribe-Post`, così i client email che supportano la disiscrizione one-click (Gmail, Outlook e altri) possono agire senza una landing page. La disiscrizione sposta un contatto allo stato `unsubscribed` immediatamente: vedi [Contatti](/it/docs/contacts) per l'API.
+**Disiscrizione one-click nel client di posta.** Le email di campagne e flussi
+portano gli header `List-Unsubscribe` e `List-Unsubscribe-Post`, così i client
+che supportano la disiscrizione one-click (Gmail, Outlook e altri) mostrano il
+proprio pulsante di disiscrizione. L'header punta sempre all'API di Tratto, mai
+a una pagina web, e un clic disiscrive subito il contatto. Le email
+transazionali inviate con `POST /v1/emails` non sono legate a un contatto e non
+hanno questi header.
+
+**La pagina delle preferenze.** Il link `{{unsubscribe_url}}` nel footer
+dell'email apre una pagina su `app.tratto.email/preferences` dove il
+destinatario può:
+
+- **disiscriversi** da tutte le email di quel mittente;
+- **disattivare il tracciamento di aperture e clic** continuando a ricevere le
+  email (vedi
+  [sotto](#consenso-tracking-pixel-provvedimento-garante-n-2842026));
+- **iscriversi di nuovo**, se si era disiscritto. Non è possibile per un
+  indirizzo sospeso dopo un bounce o una segnalazione di spam: resta sospeso, e
+  la pagina invita il destinatario a contattare il mittente.
+
+Ogni link è firmato e appartiene a un solo contatto, quindi la pagina non
+richiede login. I link di disiscrizione nelle email inviate prima che la pagina
+passasse su `app.tratto.email` funzionano ancora: reindirizzano lì. Se il tuo
+workspace ha impostato una propria pagina di disiscrizione
+(`customUnsubscribeUrl` su `PATCH /v1/workspace`), il link del footer porta lì,
+con `contact` ed `email` aggiunti alla query string; l'header one-click
+continua a puntare a Tratto.
+
+La disiscrizione, da entrambe le strade, porta il contatto allo stato
+`unsubscribed` e annulla le email ancora in attesa di partire verso di lui
+(contano come `skipped` nelle statistiche della campagna). Vedi
+[Contatti](/it/docs/contacts) per l'API.
 
 <Callout>
-La disiscrizione sospende immediatamente gli invii futuri. Non cancella il record del contatto: vedi sotto.
+La disiscrizione ferma subito gli invii futuri. Non cancella il record del
+contatto: vedi sotto.
 </Callout>
 
 ## Consenso Tracking Pixel (Provvedimento Garante n. 284/2026)
@@ -32,8 +66,16 @@ Il Garante Privacy, con il Provvedimento n. 284 del 17 aprile 2026 (doc. web n. 
 **Cosa fa Tratto tecnicamente**: il pixel di apertura (GIF trasparente 1×1) e il tracciamento click si attivano solo su email legate a un contatto noto (campagne, flussi), mai sulle transazionali pure come un reset password, dove non c'è uno scopo di engagement che lo giustifichi. L'evento di apertura non porta mai l'indirizzo del destinatario, solo un identificativo interno risolto lato server. Aperture e click vengono registrati solo entro 30 giorni dall'invio: dopo, un link tracciato porta comunque il destinatario alla destinazione, ma il click non viene registrato.
 
 <Callout type="warning">
-L'informativa e il consenso specifico verso i tuoi destinatari restano responsabilità tua, non di Tratto: sei tu il titolare del trattamento per le tue campagne (vedi sotto). Oggi Tratto offre un solo meccanismo di opt-out, la disiscrizione completa dalla lista, non un controllo separato per "continua a scrivermi ma smetti di tracciarmi". Se questo blocca il tuo workflow di compliance, scrivici a **privacy@tratto.email**.
+L'informativa e il consenso specifico verso i tuoi destinatari restano responsabilità tua, non di Tratto: sei tu il titolare del trattamento per le tue campagne (vedi sotto). Tratto fornisce la revoca granulare del punto 3.
 </Callout>
+
+**Revoca del consenso al tracciamento**: la [pagina delle preferenze](#disiscrizione-e-pagina-delle-preferenze) ha un interruttore separato che disattiva il tracciamento lasciando il destinatario iscritto. Da quel momento le email di campagne e flussi gli arrivano senza pixel di apertura e senza tracciamento dei clic: si fermano entrambi insieme. La scelta vale per le email inviate dopo, e il destinatario può riattivare il tracciamento dalla stessa pagina.
+
+Cosa significa per te come mittente:
+
+- Il contatto riporta `trackingOptOut: true` nell'[API Contatti](/it/docs/contacts) e in dashboard.
+- Puoi impostare tu l'opt-out (per esempio per rispettare una richiesta arrivata via email), ma non puoi toglierlo: `PATCH /v1/contacts/:id` con `trackingOptOut: false` su un contatto che ha fatto opt-out risponde `403 FORBIDDEN`. Solo il destinatario può riattivare il tracciamento.
+- Le statistiche della campagna contano questi destinatari come `untracked` e li escludono dai tassi di apertura e di clic, che per loro non vengono mai stimati: vedi [Campagne](/it/docs/campaigns).
 
 ## Titolare vs. Responsabile del Trattamento
 
