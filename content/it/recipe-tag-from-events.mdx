@@ -1,0 +1,191 @@
+---
+title: "Ricetta: avviare un flusso dai tuoi eventi"
+description: Aggiungi un tag a un contatto dal tuo backend quando c'è un acquisto, un carrello abbandonato o un'iscrizione a un lead magnet, e lascia che sia un flusso a inviare le email.
+---
+
+Tratto non vede cosa succede nel tuo negozio o nella tua applicazione. Non sa che è stato fatto un ordine o che un carrello è rimasto a metà. Quello che vede è un **tag aggiunto a un contatto**, ed è proprio un tag ad avviare un [flusso](/it/docs/flows). Lo schema quindi è questo:
+
+1. Nel tuo sistema succede qualcosa (un acquisto, un carrello abbandonato, l'iscrizione da un form).
+2. Il tuo backend aggiunge un tag a quel contatto tramite l'SDK.
+3. Un flusso con trigger `contact_tag_added` su quel tag invia le email.
+
+<Callout type="info">
+Non esiste un webhook in ingresso che riceva eventi da altri servizi, e non c'è un'integrazione con Shopify, WooCommerce o Zapier. Il tag deve arrivare dal tuo codice, che chiama l'API di Tratto con una chiave API dotata del permesso `contacts:write`.
+</Callout>
+
+## Passo 1: aggiungere il tag dal backend
+
+Una sola piccola funzione copre tutti i casi qui sotto. Cerca il contatto per email, lo crea con il tag se non esiste e aggiunge il tag se non c'è ancora.
+
+Due dettagli dell'API determinano il codice:
+
+- `PATCH /v1/contacts/:id` **sostituisce** l'array `tags`, non lo unisce. Invia i tag che il contatto ha già più quello nuovo, altrimenti gli altri vengono rimossi.
+- Il filtro `q` di `GET /v1/contacts` cerca per **prefisso**: `ann@example.com` trova anche `ann@example.com.au`. Confronta l'indirizzo sui risultati.
+
+Solo un tag che prima non c'era sul contatto avvia un flusso. Reinviare la stessa lista di tag non cambia nulla e non iscrive nessuno.
+
+### Node.js (`@tratto/email`)
+
+Richiede `@tratto/email` 1.4.0 o successiva (il parametro `q` di `contacts.list()`).
+
+```ts
+import { Tratto } from '@tratto/email';
+
+const tratto = new Tratto(process.env.TRATTO_API_KEY!);
+
+export async function tagContact(rawEmail: string, tag: string): Promise<void> {
+  const email = rawEmail.trim().toLowerCase();
+
+  // `q` is a prefix search: compare the address to find the exact contact.
+  const { data } = await tratto.contacts.list({ q: email });
+  const contact = data.find((c) => c.email === email);
+
+  if (!contact) {
+    await tratto.contacts.create({ email, tags: [tag] });
+  } else if (!contact.tags.includes(tag)) {
+    // The tags array is replaced, not merged: send the existing tags too.
+    await tratto.contacts.update(contact.id, { tags: [...contact.tags, tag] });
+  }
+}
+```
+
+### Python (`tratto-email`)
+
+Fino a `tratto-email` 2.2.0, `contacts.list()` non ha un filtro per email: la ricerca chiama quindi l'API direttamente con la libreria standard. Imposta un tuo `User-Agent`: l'API rifiuta con un **403** quello predefinito di `urllib`.
+
+```python
+import json
+import os
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
+from tratto import CreateContactOptions, Tratto, UpdateContactOptions
+
+API_KEY = os.environ["TRATTO_API_KEY"]
+client = Tratto(API_KEY)
+
+
+def find_contact(email: str) -> dict | None:
+    # contacts.list() has no email filter: ask the API directly.
+    request = Request(
+        "https://api.tratto.email/v1/contacts?" + urlencode({"q": email}),
+        headers={"Authorization": f"Bearer {API_KEY}", "User-Agent": "my-app/1.0"},
+    )
+    with urlopen(request) as response:
+        contacts = json.load(response)["data"]
+    # `q` is a prefix search: compare the address to find the exact contact.
+    return next((c for c in contacts if c["email"] == email), None)
+
+
+def tag_contact(raw_email: str, tag: str) -> None:
+    email = raw_email.strip().lower()
+    contact = find_contact(email)
+
+    if contact is None:
+        client.contacts.create(CreateContactOptions(email=email, tags=[tag]))
+    elif tag not in contact["tags"]:
+        # The tags array is replaced, not merged: send the existing tags too.
+        client.contacts.update(
+            contact["id"], UpdateContactOptions(tags=[*contact["tags"], tag])
+        )
+```
+
+Se due eventi per lo stesso indirizzo nuovo arrivano insieme, la seconda `create` fallisce con **409 `CONFLICT`**, perché la prima ha già creato il contatto. Richiama la funzione: questa volta trova il contatto e aggiunge il tag. Anche due aggiornamenti sullo stesso contatto nello stesso istante possono sovrascriversi i tag a vicenda, perché ognuno invia la lista completa. Se i tuoi eventi possono sovrapporsi così, elaborali un contatto alla volta.
+
+Aggiungi solo persone che hanno accettato di ricevere le tue email. Un contatto creato così è `subscribed`, e un contatto `unsubscribed`, `bounced` o `complained` viene iscritto al flusso ma saltato da ogni step `send_email`.
+
+## Passo 2: creare il flusso
+
+Crea il flusso dalla dashboard (**Flussi**) o con l'API, come mostrato nella pagina [Flussi](/it/docs/flows). Due cose decidono se invia davvero:
+
+- `tagName` nella config del trigger deve essere **esattamente** il tag che aggiunge il tuo codice. Senza, il flusso parte a ogni tag aggiunto a qualsiasi contatto.
+- Ogni template usato da uno step `send_email` deve essere `published`, altrimenti l'attivazione fallisce con **422 `TEMPLATE_NOT_PUBLISHED`**.
+
+<Callout type="warn">
+Un contatto entra in un certo flusso **una sola volta per tag**. L'iscrizione è legata a flusso, contatto e tag, e resta anche dopo la fine del flusso: togliere il tag e aggiungerlo di nuovo non iscrive il contatto una seconda volta. Tienine conto, soprattutto per i carrelli abbandonati (vedi sotto).
+</Callout>
+
+## Esempio: carrello abbandonato
+
+È il tuo backend a decidere quando un carrello è abbandonato, per esempio con un job che gira un'ora dopo l'ultima attività e controlla che il carrello sia ancora aperto. Solo allora aggiunge il tag al contatto:
+
+```ts
+await tagContact(cart.customerEmail, 'cart-abandoned');
+```
+
+Il flusso invia un promemoria e segna il contatto:
+
+```json
+{
+  "trigger": { "type": "contact_tag_added", "config": { "tagName": "cart-abandoned" } },
+  "steps": [
+    { "id": "s0", "type": "send_email", "config": { "templateId": "tmpl_cart_reminder", "subject": "Hai lasciato qualcosa nel carrello" } },
+    { "id": "s1", "type": "update_contact", "config": { "action": "add_tag", "tag": "cart-reminded" } }
+  ]
+}
+```
+
+Un flusso non può guardare i tuoi ordini. Una volta iscritto il contatto, gli step vanno avanti come configurati, anche se nel frattempo il cliente completa l'acquisto. Per questo la decisione si prende nel backend prima di aggiungere il tag, e per questo l'esempio invia una sola email.
+
+Per la regola del tag usato una volta sola, questo flusso ricorda il carrello a ogni cliente **una volta**, al primo carrello abbandonato. Se vuoi un promemoria per ogni carrello abbandonato, invialo direttamente dal backend con un [template e l'API di invio](/it/docs/send-email) invece che con un flusso.
+
+## Esempio: primo acquisto
+
+Quando un checkout va a buon fine, aggiungi un tag a chi ha comprato. Qui un tag usato una volta sola è proprio quello che serve, perché il primo acquisto capita una volta:
+
+```ts
+await tagContact(order.email, 'customer');
+```
+
+```json
+{
+  "trigger": { "type": "contact_tag_added", "config": { "tagName": "customer" } },
+  "steps": [
+    { "id": "s0", "type": "send_email", "config": { "templateId": "tmpl_thanks", "subject": "Grazie per il tuo ordine" } },
+    { "id": "s1", "type": "wait", "config": { "delay": "7", "unit": "days" } },
+    { "id": "s2", "type": "send_email", "config": { "templateId": "tmpl_getting_started", "subject": "Come sfruttarlo al meglio" } }
+  ]
+}
+```
+
+La conferma d'ordine invece è un'email transazionale: inviala con l'[API di invio](/it/docs/send-email) al momento del checkout, non con un flusso.
+
+## Esempio: consegna di un lead magnet
+
+Il form di iscrizione invia i dati al tuo backend, che aggiunge al contatto un tag con il nome della risorsa:
+
+```python
+tag_contact(form["email"], "lead-pricing-guide")
+```
+
+Il flusso consegna subito la risorsa e torna a farsi sentire qualche giorno dopo:
+
+```json
+{
+  "trigger": { "type": "contact_tag_added", "config": { "tagName": "lead-pricing-guide" } },
+  "steps": [
+    { "id": "s0", "type": "send_email", "config": { "templateId": "tmpl_pricing_guide", "subject": "La tua guida ai prezzi" } },
+    { "id": "s1", "type": "wait", "config": { "delay": "3", "unit": "days" } },
+    { "id": "s2", "type": "send_email", "config": { "templateId": "tmpl_pricing_followup", "subject": "Domande sulla guida?" } },
+    { "id": "s3", "type": "update_contact", "config": { "action": "add_tag", "tag": "nurtured" } }
+  ]
+}
+```
+
+Usa un tag per ogni risorsa. Così chi scarica due guide diverse le riceve entrambe, e chi compila due volte lo stesso form riceve la guida una volta sola.
+
+## Provalo
+
+1. Attiva il flusso.
+2. Chiama la funzione che aggiunge il tag con un indirizzo che controlli.
+3. Controlla il flusso in dashboard, oppure con `GET /v1/flows/:id`: `enrollments` sale di uno e la prima email parte nel giro di pochi secondi.
+
+Se non succede niente, controlla in quest'ordine: il flusso è `active`, `tagName` coincide con il tag carattere per carattere, e il tag non era già presente sul contatto prima della chiamata.
+
+---
+
+## Prossimi passi
+
+- **Tutte le opzioni di trigger e step?** Vedi [Flussi](/it/docs/flows)
+- **Campi e tag dei contatti?** Vedi [Contatti](/it/docs/contacts)
+- **I template che il flusso invia?** Vedi [Template](/it/docs/templates)

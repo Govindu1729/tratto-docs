@@ -62,7 +62,7 @@ queste.
 | `lang` | La lingua del documento, scritta nell'attributo `lang` dell'HTML renderizzato. Un tag di lingua: `it`, `en`, `pt-BR`. |
 | `dir` | La direzione del testo — `ltr` (default), `rtl` o `auto`. `rtl` ribalta a destra l'allineamento predefinito. |
 | `breaks` | `true` trasforma un a-capo singolo in un'interruzione di riga; `false` (default) mantiene il markdown standard, dove i paragrafi si separano con una riga vuota. |
-| `theme` | `light` (default), `dark` oppure `auto` (renderizza chiaro ma si adatta ai lettori con il client email in dark mode). Solo questi tre valori: qualsiasi altro viene ignorato, con un warning. |
+| `theme` | `light`, `dark` oppure `auto` (renderizza chiaro ma si adatta ai lettori con il client email in dark mode). Solo questi tre valori: qualsiasi altro viene ignorato, con un warning. Se manca, il documento usa il [tema del workspace](#dare-un-aspetto-diverso-a-una-campagna), e `light` se il workspace non ne ha uno. |
 
 **Qualsiasi altra chiave viene rimossa prima del render e segnalata come
 [warning di render](#warning-di-render).** In particolare:
@@ -115,6 +115,35 @@ Acme Inc — Milano
   `::: callout center compact`.
 - **`::: footer`** — testo più piccolo e attenuato in fondo, per note legali,
   link di disiscrizione e informazioni aziendali.
+- **`::: include brand-header`**: il [logo del workspace](#il-logo-del-workspace),
+  in una banda di intestazione. Una riga sola, senza `:::` di chiusura.
+
+### Il logo del workspace
+
+Caricare un logo non lo fa comparire in tutte le email. Un documento lo
+mostra solo se lo chiede, con questa riga nel punto in cui deve stare il logo
+(di solito la prima riga dopo il frontmatter):
+
+```markdown
+::: include brand-header
+
+# Il tuo ordine è partito
+```
+
+Al render la riga diventa una banda `::: header` con il logo, e il nome del
+workspace come testo alternativo. È una scelta voluta: un logo sta bene in una
+newsletter, non per forza nel reset di una password, e per toglierlo da un
+template basta cancellare la riga.
+
+Il logo viene disegnato dentro un **riquadro di 160 × 64 px**: rimpicciolito
+per entrarci, mantenendo le proporzioni, e **mai ingrandito**. Un logo più
+piccolo del riquadro resta alla sua dimensione. Le regole di caricamento e gli
+avvisi sui file piccoli o pesanti sono in
+[Branding](/it/docs/branding#carica-il-logo).
+
+Se il workspace non ha un logo, la riga non produce niente e il render
+segnala il warning `Unknown partial "brand-header"`. Il resto dell'email non
+cambia.
 
 ### Bottoni
 
@@ -137,18 +166,34 @@ placeholder letterali: è voluto.
 
 ## Dare un aspetto diverso a una campagna
 
-Colori e logo sono un'impostazione **di workspace**, condivisa da tutti i
-template; l'unica leva per singolo documento è `theme`.
+Tema, colori e logo sono un'impostazione **di workspace**, condivisa da
+tutti i template. Un documento può solo scegliere il proprio `theme` e
+decidere se mostrare il logo.
 
-- **Marchio del workspace** — i tre colori di marchio (link e bottoni primari,
-  bottoni secondari, divisori) e il logo del workspace si impostano in
-  **Settings → Workspace** nella dashboard, oppure via `PATCH /v1/workspace`
-  (l'oggetto `brand`) e `PUT /v1/workspace/brand/logo`. Li applica il renderer,
-  quindi una modifica raggiunge ogni render successivo — ma non l'HTML già
-  fissato sui template salvati prima, che mantiene i suoi colori finché il
-  template non viene salvato di nuovo.
-- **Per singolo documento** — `theme: dark`, oppure `theme: auto` per una resa
-  che segue il client email di chi legge. Non c'è altro.
+- **Marchio del workspace**: un tema predefinito, i tre colori di marchio e il
+  logo si impostano in **Settings → Workspace** nella dashboard, oppure via
+  `PATCH /v1/workspace` (l'oggetto `brand`) e `PUT /v1/workspace/brand/logo`
+  (dettagli API in [Branding](/it/docs/branding#colori-e-logo-del-marchio)).
+  I colori finiscono qui:
+
+  | Campo del marchio | Dove si vede nell'email |
+  |---|---|
+  | `primaryColor` | Link, e sfondo dei bottoni primari (`{button}`) |
+  | `secondaryColor` | Bordo ed etichetta dei bottoni secondari (`{button.secondary}`) |
+  | `accentColor` | Divisori e linee orizzontali |
+  | `theme` | La palette (`light`, `dark`, `auto`) dei documenti che non impostano un proprio `theme` |
+
+- **Per singolo documento**: `theme: light`, `theme: dark` o `theme: auto` nel
+  frontmatter prevale sul tema del workspace, e `::: include brand-header`
+  mostra il logo. Non c'è altro.
+
+**Il marchio si applica quando il markdown viene renderizzato, non quando
+l'email parte.** Una modifica al marchio raggiunge ogni render successivo, ma
+non l'HTML già fissato su template e campagne salvati prima. Un template viene
+renderizzato di nuovo solo se il suo markdown cambia: salvare lo stesso
+markdown non applica un logo o dei colori nuovi. Modifica il markdown (anche un
+solo carattere) e salva, oppure controlla prima il risultato con
+`render-preview`, che usa sempre il marchio attuale.
 
 Non esiste un override di colori, font o palette per singolo template, ed è
 voluto: quello che il workspace ha configurato è quello che ricevono i
@@ -271,10 +316,44 @@ curl -X POST https://api.tratto.email/v1/emails \
   }'
 ```
 
-Le campagne funzionano allo stesso modo: scegli il template nel
-[builder delle campagne](/it/docs/campaigns) e la campagna usa l'HTML fissato —
-click tracking, pixel di apertura e footer di disiscrizione vengono applicati
-alla consegna esattamente come per i template HTML.
+Anche le campagne partono da un template pubblicato: vedi la sezione
+seguente.
+
+## Modificare il markdown dentro una campagna
+
+Una campagna creata da un template Markdown **possiede la propria copia** del
+markdown. Da quel momento il template è il punto di partenza della campagna,
+non un legame vivo:
+
+- **Alla creazione il contenuto viene copiato, non renderizzato di nuovo.** La
+  campagna riceve il `source` del template e l'HTML fissato su di esso,
+  esattamente come li hai visti nell'editor del template.
+- **Modificare il template dopo non cambia la campagna**, e modificare la
+  campagna non tocca mai il template.
+- **Per cambiare il testo, modifica la campagna.** `PATCH /v1/campaigns/:id`
+  con un campo `markdown` (oppure l'editor markdown nella pagina della campagna
+  in dashboard) renderizza di nuovo l'HTML della campagna con il marchio
+  attuale del workspace.
+
+```bash
+curl -X PATCH https://api.tratto.email/v1/campaigns/camp_xyz789 \
+  -H "Authorization: Bearer tratto_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"markdown": "::: include brand-header\n\n# Novità di ottobre\n\nTre cose che abbiamo rilasciato."}'
+```
+
+Valgono le stesse regole dei template:
+
+| Richiesta | Risultato |
+|---|---|
+| `markdown` su una campagna Markdown in `draft` | Renderizzata di nuovo e salvata; i warning in `renderWarnings` della campagna |
+| `html` su una campagna Markdown, o `markdown` su una HTML | `422 VALIDATION_ERROR` |
+| `html` e `markdown` insieme | `422 VALIDATION_ERROR` |
+| Qualsiasi modifica a una campagna non più in `draft` | `409 CONFLICT` |
+| `templateId` | Sostituisce il contenuto con una copia nuova di quel template (che deve essere pubblicato). È l'unico modo per cambiare il formato di una campagna |
+
+Alla consegna, click tracking, pixel di apertura e footer di disiscrizione
+vengono applicati esattamente come per le campagne HTML.
 
 ## Inviare markdown senza template
 
@@ -299,6 +378,8 @@ Quelli che incontrerai più spesso:
   `breaks` che non è un booleano. Il renderer ricade sul default e lo dice.
 - **Un parametro di direttiva sconosciuto** — per esempio una parola su una
   riga `::: callout` che non è fra quelle documentate.
+- **`Unknown partial "brand-header"`**: il documento include il logo ma il
+  workspace non ne ha caricato uno. Al suo posto non compare niente.
 
 Solo due situazioni rifiutano la richiesta, entrambe con `VALIDATION_ERROR`
 (422):

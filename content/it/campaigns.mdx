@@ -56,7 +56,8 @@ viene scritto sulla campagna al momento della creazione: vedi
 
 Dalla creazione in poi la campagna possiede una **copia** del contenuto del
 template: modificare il template dopo non cambia una campagna già creata da
-esso, e modificare la campagna non tocca il template.
+esso, e modificare la campagna non tocca il template. Per una campagna
+Markdown vedi [Modificare il markdown dentro una campagna](/it/docs/emailmd-templates#modificare-il-markdown-dentro-una-campagna).
 
 <Callout type="warn">
 **Il template deve essere pubblicato.** Creare una campagna da un template
@@ -70,6 +71,54 @@ Poiché il contenuto viene copiato alla creazione, il controllo non è
 retroattivo: le campagne create prima che questo gate esistesse mantengono la
 loro copia e continuano a partire.
 </Callout>
+
+## Test A/B sull'oggetto [#ab-test]
+
+Imposta `subjectB` per mettere alla prova un secondo oggetto contro `subjectA`.
+Contenuto, mittente e audience restano gli stessi: cambia solo l'oggetto.
+
+- **Come si dividono i destinatari.** Gli oggetti si alternano un destinatario
+  alla volta: il primo riceve `subjectA`, il secondo `subjectB`, e così via.
+  Ogni oggetto raggiunge metà dell'audience, con uno in più per A se il numero è
+  dispari.
+- **Dopo una pausa.** Una campagna ripresa continua l'alternanza dal punto in cui
+  si era fermata invece di ripartire da A, così la divisione resta pari.
+- **Invii di prova.** `POST /v1/campaigns/:id/test-send` usa sempre `subjectA`,
+  preceduto da `[TEST]`.
+- **Togliere B.** Manda `"subjectB": null` con `PATCH /v1/campaigns/:id`. Come
+  ogni modifica, funziona solo su una campagna `draft`: con qualunque altro stato
+  la risposta è **409** `Campaign is '<status>'. Only draft campaigns can be edited.`
+- **Nessun vincitore automatico.** Tratto non sceglie un oggetto e non manda il
+  migliore al resto della lista: escono entrambi fino alla fine della campagna.
+  Il confronto e la scelta spettano a te.
+
+### Leggere il risultato
+
+`GET /v1/campaigns/:id/stats` aggiunge un oggetto `variants` con una voce per
+oggetto, sia in `stats` (conteggi) sia in `rates` (percentuali):
+
+```json
+{
+  "stats": {
+    "variants": {
+      "a": { "sent": 2500, "delivered": 2475, "opened": 1300, "clicked": 390, "bounced": 20, "untracked": 70 },
+      "b": { "sent": 2500, "delivered": 2475, "opened": 1175, "clicked": 352, "bounced": 20, "untracked": 60 }
+    }
+  },
+  "rates": {
+    "variants": {
+      "a": { "deliveryRate": 99, "openRate": 53.5, "clickRate": 16.05, "bounceRate": 0.8 },
+      "b": { "deliveryRate": 99, "openRate": 48.16, "clickRate": 14.43, "bounceRate": 0.8 }
+    }
+  }
+}
+```
+
+I tassi di ogni variante sono calcolati sul `sent` di quella variante, e i
+tassi di apertura e di click escludono i suoi destinatari `untracked`: la stessa
+regola dei totali della campagna ([più sotto](#ottieni-statistiche-campagna)).
+`variants` c'è solo su una campagna che ha iniziato l'invio con un `subjectB`:
+su ogni altra campagna la chiave manca, non è riempita di zeri.
 
 ## Variabili di una Campagna [#campaign-variables]
 
@@ -488,12 +537,14 @@ Note sui campi:
   inviati
 - `skipped` — invii annullati perché il contatto si è disiscritto dopo il
   dispatch. Non sono mai avvenuti, quindi non alimentano nessun tasso
-- `untracked` — destinatari che hanno rifiutato il tracciamento di aperture e
-  click. Sono **esclusi dal denominatore di openRate e clickRate**, mai
-  stimati. La chiave `untracked` dentro `rates` è quello stesso conteggio, non
-  un tasso
+- `untracked`: destinatari che avevano rifiutato il tracciamento di aperture e
+  click quando la campagna li ha raggiunti. Le loro aperture e i loro click non
+  vengono mai registrati, quindi sono **esclusi dal denominatore di openRate e
+  clickRate**, mai stimati: `openRate` è `opened / (total - untracked)`.
+  Contarli abbasserebbe i tassi per persone che di proposito non misuriamo. La
+  chiave `untracked` dentro `rates` è quello stesso conteggio, non un tasso
 - `stats.variants` e `rates.variants` compaiono solo su una campagna che ha
-  fatto un test A/B sull'oggetto
+  fatto un [test A/B sull'oggetto](#ab-test)
 - **Non esiste** un campo `complained`, né `totalSent`
 
 ## Elenca le Campagne
